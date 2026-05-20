@@ -83,7 +83,8 @@ function DashboardPage() {
   const owedByOthers = payerEntries.filter(([k]) => k.toLowerCase() !== "eu").reduce((s, [, v]) => s + v, 0);
 
   // Evolução: últimos 6 meses a partir do mês selecionado
-  const chart: { mes: string; gasto: number }[] = [];
+  const chart: { mes: string; gasto: number; patrimonio: number }[] = [];
+  const investTotalNow = investTotal; // snapshot atual de investimentos
   for (let i = 5; i >= 0; i--) {
     const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
     const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
@@ -91,7 +92,21 @@ function DashboardPage() {
     const accs = data.accTx.filter((t) => t.occurred_on >= s && t.occurred_on <= e && t.kind === "expense").reduce((s, t) => s + Number(t.amount), 0);
     const im = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     const cards = data.cardTx.filter((t) => t.invoice_month === im).reduce((s, t) => s + Number(t.amount), 0);
-    chart.push({ mes: d.toLocaleDateString("pt-BR", { month: "short" }), gasto: accs + cards });
+
+    // Patrimônio no fim do mês: saldo das contas (com tx até o fim) + investimentos atuais - fatura em aberto
+    const accBalAtEnd = data.accounts.reduce((acc, a) => {
+      const txSum = data.accTx
+        .filter((t) => t.account_id === a.id && t.occurred_on <= e)
+        .reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
+      return acc + Number(a.initial_balance) + txSum;
+    }, 0);
+    const patAtEnd = accBalAtEnd + investTotalNow - cards;
+
+    chart.push({
+      mes: d.toLocaleDateString("pt-BR", { month: "short" }),
+      gasto: accs + cards,
+      patrimonio: patAtEnd,
+    });
   }
 
   return (

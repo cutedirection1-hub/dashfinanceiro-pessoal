@@ -199,7 +199,7 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
       if (error) throw error;
 
       // Cria lançamento de saída na conta (apenas na CRIAÇÃO e quando aplicável)
-      if (!editing && canFund && debitAccount && fundingAccountId && newAporte > 0) {
+      if (!editing && canDebit && debitAccount && fundingAccountId && newAporte > 0) {
         const { error: txErr } = await supabase.from("account_transactions").insert({
           user_id: userId,
           account_id: fundingAccountId,

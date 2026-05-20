@@ -28,7 +28,7 @@ export function invoiceMonth(purchasedOnIso: string, closingDay: number): string
   const [y, m, d] = purchasedOnIso.slice(0, 10).split("-").map(Number);
   let year = y;
   let monthIdx = (m || 1) - 1;
-  if ((d || 1) >= closingDay) monthIdx += 1;
+  if ((d || 1) > closingDay) monthIdx += 1;
   if (monthIdx > 11) { monthIdx = 0; year += 1; }
   return `${year}-${String(monthIdx + 1).padStart(2, "0")}-01`;
 }

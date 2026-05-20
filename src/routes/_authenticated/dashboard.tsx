@@ -1,8 +1,9 @@
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { brl } from "@/lib/format";
-import { CreditCard, Wallet, TrendingUp, Receipt } from "lucide-react";
+import { brl, monthLabel } from "@/lib/format";
+import { CreditCard, Wallet, TrendingUp, Receipt, ChevronLeft, ChevronRight, User } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -17,14 +18,9 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-function startOfMonth(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-}
-function endOfMonth(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-}
-
 function DashboardPage() {
+  const [monthOffset, setMonthOffset] = useState(0);
+
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -45,32 +41,51 @@ function DashboardPage() {
     },
   });
 
+  const ref = useMemo(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + monthOffset);
+    const y = d.getFullYear(), m = d.getMonth();
+    return {
+      ym: `${y}-${String(m + 1).padStart(2, "0")}-01`,
+      start: new Date(y, m, 1).toISOString().slice(0, 10),
+      end: new Date(y, m + 1, 0).toISOString().slice(0, 10),
+      isCurrent: monthOffset === 0,
+    };
+  }, [monthOffset]);
+
   if (isLoading || !data) return <div className="text-muted-foreground">Carregando...</div>;
 
+  // Saldo em conta: "atual" se mês corrente, senão saldo no fim daquele mês
+  const cutoff = ref.isCurrent ? null : ref.end;
   const accBalance = data.accounts.reduce((acc, a) => {
     const txSum = data.accTx
-      .filter((t) => t.account_id === a.id)
+      .filter((t) => t.account_id === a.id && (!cutoff || t.occurred_on <= cutoff))
       .reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
     return acc + Number(a.initial_balance) + txSum;
   }, 0);
 
-  const thisMonth = new Date();
-  const ym = `${thisMonth.getFullYear()}-${String(thisMonth.getMonth() + 1).padStart(2, "0")}-01`;
-  const openInvoice = data.cardTx
-    .filter((t) => t.invoice_month === ym)
-    .reduce((s, t) => s + Number(t.amount), 0);
+  const invoiceTx = data.cardTx.filter((t) => t.invoice_month === ref.ym);
+  const openInvoice = invoiceTx.reduce((s, t) => s + Number(t.amount), 0);
 
   const monthSpend = data.accTx
-    .filter((t) => t.occurred_on >= startOfMonth() && t.occurred_on <= endOfMonth() && t.kind === "expense")
+    .filter((t) => t.occurred_on >= ref.start && t.occurred_on <= ref.end && t.kind === "expense")
     .reduce((s, t) => s + Number(t.amount), 0);
 
   const investTotal = data.inv.reduce((s, i) => s + Number(i.quantity) * Number(i.current_price || i.average_price), 0);
   const patrimonio = accBalance + investTotal - openInvoice;
 
-  // Build last 6 months expense chart
+  // Divisão por responsável da fatura do mês selecionado
+  const byPayer = invoiceTx.reduce<Record<string, number>>((acc, t) => {
+    const k = (t.payer_name as string | null)?.trim() || "Eu";
+    acc[k] = (acc[k] || 0) + Number(t.amount);
+    return acc;
+  }, {});
+  const payerEntries = Object.entries(byPayer).sort((a, b) => b[1] - a[1]);
+  const owedByOthers = payerEntries.filter(([k]) => k.toLowerCase() !== "eu").reduce((s, [, v]) => s + v, 0);
+
+  // Evolução: últimos 6 meses a partir do mês selecionado
   const chart: { mes: string; gasto: number }[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(); d.setMonth(d.getMonth() - i);
+    const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
     const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
     const e = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
     const accs = data.accTx.filter((t) => t.occurred_on >= s && t.occurred_on <= e && t.kind === "expense").reduce((s, t) => s + Number(t.amount), 0);
@@ -81,19 +96,55 @@ function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold">Visão geral</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Seu panorama financeiro de hoje.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold">Visão geral</h1>
+          <p className="mt-1 text-sm text-muted-foreground capitalize">{monthLabel(ref.ym)}{ref.isCurrent && " (atual)"}</p>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+          <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
+          <button onClick={() => setMonthOffset(0)} className="rounded-md px-3 py-1 text-xs hover:bg-accent">Hoje</button>
+          <button onClick={() => setMonthOffset(monthOffset + 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+      </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi icon={TrendingUp} label="Patrimônio" value={brl(patrimonio)} accent />
-        <Kpi icon={Wallet} label="Saldo em contas" value={brl(accBalance)} />
-        <Kpi icon={CreditCard} label="Fatura aberta" value={brl(openInvoice)} />
+        <Kpi icon={Wallet} label={ref.isCurrent ? "Saldo em contas" : "Saldo no fim do mês"} value={brl(accBalance)} />
+        <Kpi icon={CreditCard} label="Fatura do mês" value={brl(openInvoice)} />
         <Kpi icon={Receipt} label="Gastos do mês" value={brl(monthSpend)} />
       </div>
 
+      {payerEntries.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Divisão da fatura</h2>
+            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">A receber: <span className="font-semibold text-primary">{brl(owedByOthers)}</span></span>}
+          </div>
+          <p className="text-xs text-muted-foreground">Quanto cada responsável gastou no cartão neste mês</p>
+          <div className="mt-4 space-y-2">
+            {payerEntries.map(([name, val]) => {
+              const pct = (val / Math.max(openInvoice, 1)) * 100;
+              const isMe = name.toLowerCase() === "eu";
+              return (
+                <div key={name}>
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground"><User className="h-3 w-3" />{name}{!isMe && <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">a receber</span>}</span>
+                    <span className="tabular-nums">{brl(val)} · {pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                    <div className={`h-full ${isMe ? "bg-primary" : "bg-accent-foreground/60"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 rounded-2xl border border-border bg-card p-6">
         <h2 className="text-lg font-semibold">Evolução de gastos</h2>
-        <p className="text-xs text-muted-foreground">Últimos 6 meses (contas + cartões)</p>
+        <p className="text-xs text-muted-foreground">6 meses até {monthLabel(ref.ym)} (contas + cartões)</p>
         <div className="mt-4 h-64">
           <ResponsiveContainer>
             <LineChart data={chart}>

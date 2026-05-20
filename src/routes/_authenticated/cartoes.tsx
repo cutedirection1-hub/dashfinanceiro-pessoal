@@ -5,19 +5,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, addMonths, monthLabel } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });
 
 type Card = { id: string; name: string; brand: string | null; credit_limit: number; closing_day: number; due_day: number };
-type CTx = { id: string; card_id: string; group_id: string; amount: number; description: string | null; purchased_on: string; installment_no: number; installment_total: number; invoice_month: string };
+type CTx = { id: string; card_id: string; group_id: string; amount: number; description: string | null; purchased_on: string; installment_no: number; installment_total: number; invoice_month: string; payer_name: string | null };
 
 function CartoesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [showCard, setShowCard] = useState(false);
+  const [editCard, setEditCard] = useState<Card | null>(null);
   const [showTx, setShowTx] = useState(false);
+  const [editTx, setEditTx] = useState<CTx | null>(null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
 
@@ -44,7 +46,15 @@ function CartoesPage() {
   const cardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
 
-  const del = useMutation({
+  // Resumo por responsável
+  const byPayer = cardTx.reduce<Record<string, number>>((acc, t) => {
+    const k = t.payer_name?.trim() || "Eu";
+    acc[k] = (acc[k] || 0) + Number(t.amount);
+    return acc;
+  }, {});
+  const payersList = Object.entries(byPayer).sort((a, b) => b[1] - a[1]);
+
+  const delCard = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("credit_cards").update({ archived: true }).eq("id", id); if (error) throw error; },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success("Cartão arquivado"); },
   });
@@ -57,8 +67,8 @@ function CartoesPage() {
   return (
     <div>
       <Header title="Cartões de crédito">
-        <button onClick={() => setShowTx(true)} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
-        <button onClick={() => setShowCard(true)} className="btn-primary"><Plus className="h-4 w-4" /> Novo cartão</button>
+        <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
+        <button onClick={() => { setEditCard(null); setShowCard(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo cartão</button>
       </Header>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -75,7 +85,10 @@ function CartoesPage() {
                   <h3 className="font-semibold">{c.name}</h3>
                   <p className="text-xs text-muted-foreground">{c.brand || "—"} · venc. dia {c.due_day}</p>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); if (confirm("Arquivar cartão?")) del.mutate(c.id); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                <div className="flex gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); setEditCard(c); setShowCard(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); if (confirm("Arquivar cartão?")) delCard.mutate(c.id); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                </div>
               </div>
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground">Fatura do mês</div>
@@ -108,6 +121,23 @@ function CartoesPage() {
               <button onClick={() => setMonthOffset(monthOffset + 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>
+
+          {payersList.length > 0 && (
+            <div className="border-b border-border bg-secondary/30 px-5 py-3">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">Divisão por responsável</div>
+              <div className="flex flex-wrap gap-2">
+                {payersList.map(([name, val]) => (
+                  <div key={name} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="font-medium">{name}</span>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="tabular-nums">{brl(val)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {cardTx.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</div>
           ) : (
@@ -116,10 +146,11 @@ function CartoesPage() {
                 <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
                   <div>
                     <div className="font-medium">{t.description || "Compra"}{t.installment_total > 1 && <span className="ml-2 text-xs text-muted-foreground">({t.installment_no}/{t.installment_total})</span>}</div>
-                    <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)}</div>
+                    <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}</div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{brl(t.amount)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium tabular-nums">{brl(t.amount)}</span>
+                    <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => confirm("Remover esta compra (e parcelas futuras)?") && delTx.mutate(t.group_id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </li>
@@ -129,34 +160,36 @@ function CartoesPage() {
         </div>
       )}
 
-      {showCard && <NewCardDialog onClose={() => setShowCard(false)} userId={user!.id} />}
-      {showTx && <NewCardTxDialog cards={cards} onClose={() => setShowTx(false)} userId={user!.id} />}
+      {showCard && <CardDialog onClose={() => { setShowCard(false); setEditCard(null); }} userId={user!.id} editing={editCard} />}
+      {showTx && <CardTxDialog cards={cards} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
     </div>
   );
 }
 
-function NewCardDialog({ onClose, userId }: { onClose: () => void; userId: string }) {
+function CardDialog({ onClose, userId, editing }: { onClose: () => void; userId: string; editing: Card | null }) {
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [brand, setBrand] = useState("");
-  const [limit, setLimit] = useState("");
-  const [closing, setClosing] = useState("1");
-  const [due, setDue] = useState("10");
+  const [name, setName] = useState(editing?.name ?? "");
+  const [brand, setBrand] = useState(editing?.brand ?? "");
+  const [limit, setLimit] = useState(String(editing?.credit_limit ?? ""));
+  const [closing, setClosing] = useState(String(editing?.closing_day ?? "1"));
+  const [due, setDue] = useState(String(editing?.due_day ?? "10"));
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("credit_cards").insert({
+      const payload = {
         user_id: userId, name, brand: brand || null, credit_limit: Number(limit) || 0,
         closing_day: Math.max(1, Math.min(31, Number(closing))), due_day: Math.max(1, Math.min(31, Number(due))),
-      });
+      };
+      const q = editing ? supabase.from("credit_cards").update(payload).eq("id", editing.id) : supabase.from("credit_cards").insert(payload);
+      const { error } = await q;
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success("Cartão criado"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success(editing ? "Cartão atualizado" : "Cartão criado"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Dialog title="Novo cartão" onClose={onClose}>
+    <Dialog title={editing ? "Editar cartão" : "Novo cartão"} onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
         <Field label="Apelido"><input required value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="Ex: Nubank Roxinho" /></Field>
         <Field label="Bandeira"><input value={brand} onChange={(e) => setBrand(e.target.value)} className="input" placeholder="Ex: Mastercard" /></Field>
@@ -171,13 +204,14 @@ function NewCardDialog({ onClose, userId }: { onClose: () => void; userId: strin
   );
 }
 
-function NewCardTxDialog({ cards, onClose, userId }: { cards: Card[]; onClose: () => void; userId: string }) {
+function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onClose: () => void; userId: string; editing: CTx | null }) {
   const qc = useQueryClient();
-  const [cardId, setCardId] = useState(cards[0]?.id ?? "");
-  const [amount, setAmount] = useState("");
-  const [desc, setDesc] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [installments, setInstallments] = useState("1");
+  const [cardId, setCardId] = useState(editing?.card_id ?? cards[0]?.id ?? "");
+  const [amount, setAmount] = useState(editing ? String(Number(editing.amount) * Number(editing.installment_total)) : "");
+  const [desc, setDesc] = useState(editing?.description ?? "");
+  const [date, setDate] = useState(editing?.purchased_on ?? new Date().toISOString().slice(0, 10));
+  const [installments, setInstallments] = useState(String(editing?.installment_total ?? "1"));
+  const [payer, setPayer] = useState(editing?.payer_name ?? "Eu");
 
   const save = useMutation({
     mutationFn: async () => {
@@ -186,28 +220,39 @@ function NewCardTxDialog({ cards, onClose, userId }: { cards: Card[]; onClose: (
       const totalAmount = Number(amount);
       const parcel = +(totalAmount / total).toFixed(2);
       const firstInvoice = invoiceMonth(new Date(date), card.closing_day);
-      const group_id = crypto.randomUUID();
+      const group_id = editing?.group_id ?? crypto.randomUUID();
+
+      // Em edição, removemos todas as parcelas do mesmo grupo e recriamos
+      if (editing) {
+        const { error: delErr } = await supabase.from("card_transactions").delete().eq("group_id", editing.group_id);
+        if (delErr) throw delErr;
+      }
+
       const rows = Array.from({ length: total }, (_, i) => ({
         user_id: userId, card_id: cardId, group_id,
         amount: parcel, description: desc || null,
         purchased_on: date,
         installment_no: i + 1, installment_total: total,
         invoice_month: addMonths(firstInvoice, i),
+        payer_name: payer.trim() || null,
       }));
       const { error } = await supabase.from("card_transactions").insert(rows);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Compra registrada"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Compra atualizada" : "Compra registrada"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Dialog title="Nova compra no cartão" onClose={onClose}>
+    <Dialog title={editing ? "Editar compra" : "Nova compra no cartão"} onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
         <Field label="Cartão">
           <select required value={cardId} onChange={(e) => setCardId(e.target.value)} className="input">
             {cards.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+        </Field>
+        <Field label="Responsável pela compra">
+          <input value={payer} onChange={(e) => setPayer(e.target.value)} className="input" placeholder="Ex: Eu, João, Maria" list="payers-list" />
         </Field>
         <Field label="Valor total (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
         <Field label="Descrição"><input value={desc} onChange={(e) => setDesc(e.target.value)} className="input" placeholder="Ex: Notebook" /></Field>

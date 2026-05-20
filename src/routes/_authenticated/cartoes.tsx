@@ -22,6 +22,7 @@ function CartoesPage() {
   const [editTx, setEditTx] = useState<CTx | null>(null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [payerFilter, setPayerFilter] = useState<string>("all");
 
   const { data } = useQuery({
     queryKey: ["cartoes"],

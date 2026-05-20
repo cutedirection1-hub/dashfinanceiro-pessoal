@@ -96,12 +96,16 @@ function InvestimentosPage() {
             <tbody className="divide-y divide-border">
               {inv.map((i) => {
                 const isBalance = BALANCE_MODE.has(i.asset_class);
+                const bank = accounts.find((a) => a.id === i.funding_account_id)?.name;
                 return (
                   <tr key={i.id} className="hover:bg-accent/30">
                     <td className="px-5 py-3">
                       <button onClick={() => { setEditing(i); setShow(true); }} className="text-left">
                         <div className="font-medium">{i.ticker || i.name}</div>
-                        <div className="text-xs text-muted-foreground">{CLASSES[i.asset_class]}{i.ticker && i.name ? ` · ${i.name}` : ""}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {CLASSES[i.asset_class]}{i.ticker && i.name ? ` · ${i.name}` : ""}
+                          {bank && <span> · <span className="text-foreground/70">{bank}</span></span>}
+                        </div>
                       </button>
                     </td>
                     <td className="px-3 py-3 text-right text-xs text-muted-foreground">
@@ -154,7 +158,9 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
   const [debitAccount, setDebitAccount] = useState<boolean>(!editing); // por padrão debita ao criar
 
   const isBalanceMode = BALANCE_MODE.has(cls);
-  const canFund = !NO_FUNDING.has(cls) && accounts.length > 0;
+  const hasAccounts = accounts.length > 0;
+  const canDebit = !NO_FUNDING.has(cls) && hasAccounts;
+  const canFund = hasAccounts; // permite informar banco mesmo em previdência
 
   const save = useMutation({
     mutationFn: async () => {
@@ -193,7 +199,7 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
       if (error) throw error;
 
       // Cria lançamento de saída na conta (apenas na CRIAÇÃO e quando aplicável)
-      if (!editing && canFund && debitAccount && fundingAccountId && newAporte > 0) {
+      if (!editing && canDebit && debitAccount && fundingAccountId && newAporte > 0) {
         const { error: txErr } = await supabase.from("account_transactions").insert({
           user_id: userId,
           account_id: fundingAccountId,
@@ -247,12 +253,13 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
 
         {canFund && (
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
-            <Field label="Conta de origem do aporte">
+            <Field label="Banco / corretora onde está o investimento">
               <select value={fundingAccountId} onChange={(e) => setFundingAccountId(e.target.value)} className="input">
+                <option value="">— Não informar —</option>
                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </Field>
-            {!editing && (
+            {!editing && canDebit && (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input type="checkbox" checked={debitAccount} onChange={(e) => setDebitAccount(e.target.checked)} />
                 Debitar este valor do saldo da conta agora

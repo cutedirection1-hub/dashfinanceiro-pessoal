@@ -22,6 +22,7 @@ function CartoesPage() {
   const [editTx, setEditTx] = useState<CTx | null>(null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [payerFilter, setPayerFilter] = useState<string>("all");
 
   const { data } = useQuery({
     queryKey: ["cartoes"],
@@ -43,11 +44,14 @@ function CartoesPage() {
   }, [monthOffset]);
 
   const activeCard = selectedCard ?? cards[0]?.id;
-  const cardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
+  const allCardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
+  const cardTx = payerFilter === "all"
+    ? allCardTx
+    : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter);
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
 
-  // Resumo por responsável
-  const byPayer = cardTx.reduce<Record<string, number>>((acc, t) => {
+  // Resumo por responsável (sempre baseado em todos)
+  const byPayer = allCardTx.reduce<Record<string, number>>((acc, t) => {
     const k = t.payer_name?.trim() || "Eu";
     acc[k] = (acc[k] || 0) + Number(t.amount);
     return acc;
@@ -78,8 +82,8 @@ function CartoesPage() {
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
           const active = activeCard === c.id;
           return (
-            <button key={c.id} onClick={() => setSelectedCard(c.id)}
-              className={`text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
+            <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
+              className={`cursor-pointer text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-semibold">{c.name}</h3>
@@ -102,7 +106,7 @@ function CartoesPage() {
                   <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />
                 </div>
               </div>
-            </button>
+            </div>
           );
         })}
         {!cards.length && <EmptyState text="Cadastre seu primeiro cartão para começar." />}
@@ -124,15 +128,27 @@ function CartoesPage() {
 
           {payersList.length > 0 && (
             <div className="border-b border-border bg-secondary/30 px-5 py-3">
-              <div className="mb-2 text-xs font-medium text-muted-foreground">Divisão por responsável</div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-medium text-muted-foreground">Divisão por responsável</div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">Filtrar:</label>
+                  <select value={payerFilter} onChange={(e) => setPayerFilter(e.target.value)} className="input h-8 py-0 text-xs">
+                    <option value="all">Todos</option>
+                    {payersList.map(([name]) => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {payersList.map(([name, val]) => (
-                  <div key={name} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm">
+                  <button
+                    key={name}
+                    onClick={() => setPayerFilter(payerFilter === name ? "all" : name)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${payerFilter === name ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/40"}`}>
                     <User className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="font-medium">{name}</span>
                     <span className="text-muted-foreground">·</span>
                     <span className="tabular-nums">{brl(val)}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -219,7 +235,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
       const total = Math.max(1, Number(installments));
       const totalAmount = Number(amount);
       const parcel = +(totalAmount / total).toFixed(2);
-      const firstInvoice = invoiceMonth(new Date(date), card.closing_day);
+      const firstInvoice = invoiceMonth(date, card.closing_day);
       const group_id = editing?.group_id ?? crypto.randomUUID();
 
       // Em edição, removemos todas as parcelas do mesmo grupo e recriamos

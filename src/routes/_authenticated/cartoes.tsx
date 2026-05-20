@@ -82,8 +82,8 @@ function CartoesPage() {
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
           const active = activeCard === c.id;
           return (
-            <button key={c.id} onClick={() => setSelectedCard(c.id)}
-              className={`text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
+            <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
+              className={`cursor-pointer text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-semibold">{c.name}</h3>
@@ -106,7 +106,7 @@ function CartoesPage() {
                   <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />
                 </div>
               </div>
-            </button>
+            </div>
           );
         })}
         {!cards.length && <EmptyState text="Cadastre seu primeiro cartão para começar." />}

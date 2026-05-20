@@ -158,7 +158,9 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
   const [debitAccount, setDebitAccount] = useState<boolean>(!editing); // por padrão debita ao criar
 
   const isBalanceMode = BALANCE_MODE.has(cls);
-  const canFund = !NO_FUNDING.has(cls) && accounts.length > 0;
+  const hasAccounts = accounts.length > 0;
+  const canDebit = !NO_FUNDING.has(cls) && hasAccounts;
+  const canFund = hasAccounts; // permite informar banco mesmo em previdência
 
   const save = useMutation({
     mutationFn: async () => {

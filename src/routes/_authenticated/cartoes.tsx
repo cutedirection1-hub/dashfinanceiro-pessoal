@@ -44,11 +44,14 @@ function CartoesPage() {
   }, [monthOffset]);
 
   const activeCard = selectedCard ?? cards[0]?.id;
-  const cardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
+  const allCardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
+  const cardTx = payerFilter === "all"
+    ? allCardTx
+    : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter);
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
 
-  // Resumo por responsável
-  const byPayer = cardTx.reduce<Record<string, number>>((acc, t) => {
+  // Resumo por responsável (sempre baseado em todos)
+  const byPayer = allCardTx.reduce<Record<string, number>>((acc, t) => {
     const k = t.payer_name?.trim() || "Eu";
     acc[k] = (acc[k] || 0) + Number(t.amount);
     return acc;

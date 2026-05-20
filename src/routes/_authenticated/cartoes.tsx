@@ -220,7 +220,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
       const total = Math.max(1, Number(installments));
       const totalAmount = Number(amount);
       const parcel = +(totalAmount / total).toFixed(2);
-      const firstInvoice = invoiceMonth(new Date(date), card.closing_day);
+      const firstInvoice = invoiceMonth(date, card.closing_day);
       const group_id = editing?.group_id ?? crypto.randomUUID();
 
       // Em edição, removemos todas as parcelas do mesmo grupo e recriamos

@@ -96,12 +96,16 @@ function InvestimentosPage() {
             <tbody className="divide-y divide-border">
               {inv.map((i) => {
                 const isBalance = BALANCE_MODE.has(i.asset_class);
+                const bank = accounts.find((a) => a.id === i.funding_account_id)?.name;
                 return (
                   <tr key={i.id} className="hover:bg-accent/30">
                     <td className="px-5 py-3">
                       <button onClick={() => { setEditing(i); setShow(true); }} className="text-left">
                         <div className="font-medium">{i.ticker || i.name}</div>
-                        <div className="text-xs text-muted-foreground">{CLASSES[i.asset_class]}{i.ticker && i.name ? ` · ${i.name}` : ""}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {CLASSES[i.asset_class]}{i.ticker && i.name ? ` · ${i.name}` : ""}
+                          {bank && <span> · <span className="text-foreground/70">{bank}</span></span>}
+                        </div>
                       </button>
                     </td>
                     <td className="px-3 py-3 text-right text-xs text-muted-foreground">

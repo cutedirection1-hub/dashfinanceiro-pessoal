@@ -49,8 +49,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Meu Financeiro — organize cartões, contas e investimentos" },
+      { title: "DashFinanceiro" },
       { name: "description", content: "App pessoal de organização financeira: cartões de crédito, contas bancárias e investimentos em um só lugar." },
+      { property: "og:title", content: "DashFinanceiro" },
+      { name: "twitter:title", content: "DashFinanceiro" },
+      { property: "og:description", content: "App pessoal de organização financeira: cartões de crédito, contas bancárias e investimentos em um só lugar." },
+      { name: "twitter:description", content: "App pessoal de organização financeira: cartões de crédito, contas bancárias e investimentos em um só lugar." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/950e8b2c-54e0-4971-8a27-dfa62aa30ce8/id-preview-ac3615fd--3d006b93-783c-4fbc-98f0-4b1bb927b992.lovable.app-1779294758364.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/950e8b2c-54e0-4971-8a27-dfa62aa30ce8/id-preview-ac3615fd--3d006b93-783c-4fbc-98f0-4b1bb927b992.lovable.app-1779294758364.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:type", content: "website" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

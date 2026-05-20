@@ -253,12 +253,13 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
 
         {canFund && (
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
-            <Field label="Conta de origem do aporte">
+            <Field label="Banco / corretora onde está o investimento">
               <select value={fundingAccountId} onChange={(e) => setFundingAccountId(e.target.value)} className="input">
+                <option value="">— Não informar —</option>
                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </Field>
-            {!editing && (
+            {!editing && canDebit && (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input type="checkbox" checked={debitAccount} onChange={(e) => setDebitAccount(e.target.checked)} />
                 Debitar este valor do saldo da conta agora

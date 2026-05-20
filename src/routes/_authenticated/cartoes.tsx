@@ -128,15 +128,27 @@ function CartoesPage() {
 
           {payersList.length > 0 && (
             <div className="border-b border-border bg-secondary/30 px-5 py-3">
-              <div className="mb-2 text-xs font-medium text-muted-foreground">Divisão por responsável</div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-medium text-muted-foreground">Divisão por responsável</div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">Filtrar:</label>
+                  <select value={payerFilter} onChange={(e) => setPayerFilter(e.target.value)} className="input h-8 py-0 text-xs">
+                    <option value="all">Todos</option>
+                    {payersList.map(([name]) => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {payersList.map(([name, val]) => (
-                  <div key={name} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm">
+                  <button
+                    key={name}
+                    onClick={() => setPayerFilter(payerFilter === name ? "all" : name)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${payerFilter === name ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/40"}`}>
                     <User className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="font-medium">{name}</span>
                     <span className="text-muted-foreground">·</span>
                     <span className="tabular-nums">{brl(val)}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

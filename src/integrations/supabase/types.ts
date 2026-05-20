@@ -110,6 +110,7 @@ export type Database = {
           installment_no: number
           installment_total: number
           invoice_month: string
+          payer_name: string | null
           purchased_on: string
           user_id: string
         }
@@ -124,6 +125,7 @@ export type Database = {
           installment_no?: number
           installment_total?: number
           invoice_month: string
+          payer_name?: string | null
           purchased_on?: string
           user_id: string
         }
@@ -138,6 +140,7 @@ export type Database = {
           installment_no?: number
           installment_total?: number
           invoice_month?: string
+          payer_name?: string | null
           purchased_on?: string
           user_id?: string
         }
@@ -230,6 +233,7 @@ export type Database = {
           average_price: number
           created_at: string
           current_price: number
+          funding_account_id: string | null
           id: string
           name: string
           notes: string | null
@@ -243,6 +247,7 @@ export type Database = {
           average_price?: number
           created_at?: string
           current_price?: number
+          funding_account_id?: string | null
           id?: string
           name: string
           notes?: string | null
@@ -256,6 +261,7 @@ export type Database = {
           average_price?: number
           created_at?: string
           current_price?: number
+          funding_account_id?: string | null
           id?: string
           name?: string
           notes?: string | null

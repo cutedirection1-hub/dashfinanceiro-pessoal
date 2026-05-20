@@ -177,7 +177,7 @@ function NewTxDialog({ accounts, onClose, userId }: { accounts: Account[]; onClo
 }
 
 // Shared UI helpers (used across pages)
-export function Header({ title, subtitle, children }: { title: string; subtitle?: string; children?: React.ReactNode }) {
+export function Header({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
@@ -189,7 +189,7 @@ export function Header({ title, subtitle, children }: { title: string; subtitle?
   );
 }
 
-export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -200,7 +200,7 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
   );
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>

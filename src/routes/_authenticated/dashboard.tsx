@@ -175,6 +175,25 @@ function DashboardPage() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      <div className="mt-6 rounded-2xl border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold">Evolução do patrimônio</h2>
+        <p className="text-xs text-muted-foreground">6 meses até {monthLabel(ref.ym)} (contas + investimentos − fatura)</p>
+        <div className="mt-4 h-64">
+          <ResponsiveContainer>
+            <LineChart data={chart}>
+              <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
+              <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
+              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} />
+              <Tooltip
+                contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
+                formatter={(v: number) => brl(v)}
+              />
+              <Line type="monotone" dataKey="patrimonio" stroke="oklch(0.72 0.18 265)" strokeWidth={2.5} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }

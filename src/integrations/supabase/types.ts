@@ -112,6 +112,8 @@ export type Database = {
           invoice_month: string
           payer_name: string | null
           purchased_on: string
+          recurrence: string
+          recurrence_group_id: string | null
           user_id: string
         }
         Insert: {
@@ -127,6 +129,8 @@ export type Database = {
           invoice_month: string
           payer_name?: string | null
           purchased_on?: string
+          recurrence?: string
+          recurrence_group_id?: string | null
           user_id: string
         }
         Update: {
@@ -142,6 +146,8 @@ export type Database = {
           invoice_month?: string
           payer_name?: string | null
           purchased_on?: string
+          recurrence?: string
+          recurrence_group_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -223,6 +229,42 @@ export type Database = {
           due_day?: number
           id?: string
           name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investment_contributions: {
+        Row: {
+          account_tx_id: string | null
+          amount: number
+          created_at: string
+          funding_account_id: string | null
+          id: string
+          investment_id: string
+          notes: string | null
+          occurred_on: string
+          user_id: string
+        }
+        Insert: {
+          account_tx_id?: string | null
+          amount: number
+          created_at?: string
+          funding_account_id?: string | null
+          id?: string
+          investment_id: string
+          notes?: string | null
+          occurred_on?: string
+          user_id: string
+        }
+        Update: {
+          account_tx_id?: string | null
+          amount?: number
+          created_at?: string
+          funding_account_id?: string | null
+          id?: string
+          investment_id?: string
+          notes?: string | null
+          occurred_on?: string
           user_id?: string
         }
         Relationships: []

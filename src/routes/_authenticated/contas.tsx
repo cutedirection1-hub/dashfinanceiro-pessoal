@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/contas")({ component: ContasPage });
 
@@ -17,13 +17,14 @@ function ContasPage() {
   const qc = useQueryClient();
   const [showAcct, setShowAcct] = useState(false);
   const [showTx, setShowTx] = useState(false);
+  const [editTx, setEditTx] = useState<Tx | null>(null);
 
   const { data } = useQuery({
     queryKey: ["contas"],
     queryFn: async () => {
       const [a, t] = await Promise.all([
         supabase.from("accounts").select("*").eq("archived", false).order("created_at"),
-        supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(50),
+        supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(100),
       ]);
       return { accounts: (a.data ?? []) as Account[], tx: (t.data ?? []) as Tx[] };
     },
@@ -41,15 +42,35 @@ function ContasPage() {
 
   const total = accounts.reduce((s, a) => s + balanceOf(a.id), 0);
 
-  const del = useMutation({
+  const archive = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("accounts").update({ archived: true }).eq("id", id); if (error) throw error; },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success("Conta arquivada"); },
+  });
+
+  const delAccount = useMutation({
+    mutationFn: async (id: string) => {
+      const { error: txErr } = await supabase.from("account_transactions").delete().eq("account_id", id);
+      if (txErr) throw txErr;
+      const { error } = await supabase.from("accounts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Conta excluída");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const delTx = useMutation({
+    mutationFn: async (id: string) => { const { error } = await supabase.from("account_transactions").delete().eq("id", id); if (error) throw error; },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Lançamento removido"); },
   });
 
   return (
     <div>
       <Header title="Contas bancárias" subtitle={`Saldo total: ${brl(total)}`}>
-        <button onClick={() => setShowTx(true)} disabled={!accounts.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançamento</button>
+        <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!accounts.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançamento</button>
         <button onClick={() => setShowAcct(true)} className="btn-primary"><Plus className="h-4 w-4" /> Nova conta</button>
       </Header>
 
@@ -61,7 +82,10 @@ function ContasPage() {
                 <h3 className="font-semibold">{a.name}</h3>
                 <p className="text-xs text-muted-foreground">{a.bank || a.type}</p>
               </div>
-              <button onClick={() => confirm("Arquivar essa conta?") && del.mutate(a.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+              <div className="flex gap-1">
+                <button title="Arquivar" onClick={() => confirm("Arquivar essa conta? Os lançamentos serão mantidos.") && archive.mutate(a.id)} className="text-muted-foreground hover:text-primary"><Archive className="h-4 w-4" /></button>
+                <button title="Excluir conta e lançamentos" onClick={() => confirm("EXCLUIR essa conta e TODOS os seus lançamentos? Esta ação não pode ser desfeita.") && delAccount.mutate(a.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+              </div>
             </div>
             <div className="mt-4 text-2xl font-semibold">{brl(balanceOf(a.id))}</div>
           </div>
@@ -84,8 +108,12 @@ function ContasPage() {
                       <div className="text-xs text-muted-foreground">{acct?.name} · {fmtDate(t.occurred_on)}</div>
                     </div>
                   </div>
-                  <div className={`font-medium ${t.kind === "income" ? "text-primary" : ""}`}>
-                    {t.kind === "income" ? "+" : "-"}{brl(t.amount)}
+                  <div className="flex items-center gap-3">
+                    <div className={`font-medium tabular-nums ${t.kind === "income" ? "text-primary" : ""}`}>
+                      {t.kind === "income" ? "+" : "-"}{brl(t.amount)}
+                    </div>
+                    <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => confirm("Remover este lançamento?") && delTx.mutate(t.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </li>
               );
@@ -95,7 +123,7 @@ function ContasPage() {
       )}
 
       {showAcct && <NewAccountDialog onClose={() => setShowAcct(false)} userId={user!.id} />}
-      {showTx && <NewTxDialog accounts={accounts} onClose={() => setShowTx(false)} userId={user!.id} />}
+      {showTx && <TxDialog accounts={accounts} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
     </div>
   );
 }
@@ -136,27 +164,29 @@ function NewAccountDialog({ onClose, userId }: { onClose: () => void; userId: st
   );
 }
 
-function NewTxDialog({ accounts, onClose, userId }: { accounts: Account[]; onClose: () => void; userId: string }) {
+function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[]; onClose: () => void; userId: string; editing: Tx | null }) {
   const qc = useQueryClient();
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
-  const [kind, setKind] = useState<"income" | "expense">("expense");
-  const [amount, setAmount] = useState("");
-  const [desc, setDesc] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [accountId, setAccountId] = useState(editing?.account_id ?? accounts[0]?.id ?? "");
+  const [kind, setKind] = useState<"income" | "expense">((editing?.kind as any) ?? "expense");
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
+  const [desc, setDesc] = useState(editing?.description ?? "");
+  const [date, setDate] = useState(editing?.occurred_on ?? new Date().toISOString().slice(0, 10));
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("account_transactions").insert({
-        user_id: userId, account_id: accountId, kind, amount: Number(amount), description: desc || null, occurred_on: date,
-      });
+      const payload = { user_id: userId, account_id: accountId, kind, amount: Number(amount), description: desc || null, occurred_on: date };
+      const q = editing
+        ? supabase.from("account_transactions").update(payload).eq("id", editing.id)
+        : supabase.from("account_transactions").insert(payload);
+      const { error } = await q;
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Lançamento salvo"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Dialog title="Novo lançamento" onClose={onClose}>
+    <Dialog title={editing ? "Editar lançamento" : "Novo lançamento"} onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => setKind("expense")} className={`rounded-lg px-3 py-2 text-sm ${kind === "expense" ? "bg-destructive/20 text-destructive ring-1 ring-destructive/40" : "bg-secondary"}`}>Saída</button>
@@ -192,7 +222,7 @@ export function Header({ title, subtitle, children }: { title: string; subtitle?
 export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-4 text-lg font-semibold">{title}</h2>
         {children}
       </div>

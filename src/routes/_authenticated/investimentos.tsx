@@ -3,15 +3,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl } from "@/lib/format";
+import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/investimentos")({ component: InvestimentosPage });
 
 type Inv = { id: string; asset_class: string; ticker: string | null; name: string; quantity: number; average_price: number; current_price: number; funding_account_id: string | null };
 type Account = { id: string; name: string };
+type Contrib = { id: string; investment_id: string; amount: number; occurred_on: string; funding_account_id: string | null; account_tx_id: string | null; notes: string | null };
 
 const CLASSES: Record<string, string> = {
   stock: "Ação",
@@ -25,9 +26,7 @@ const CLASSES: Record<string, string> = {
   other: "Outro",
 };
 
-// Classes que usam modo "saldo único" (sem preço x quantidade)
-const BALANCE_MODE = new Set(["fixed_income", "caixinha", "previdencia"]);
-// Classes que NÃO descontam saldo da conta (apenas somam ao patrimônio)
+const BALANCE_MODE = new Set(["fixed_income", "caixinha", "previdencia", "fund", "other"]);
 const NO_FUNDING = new Set(["previdencia"]);
 
 function InvestimentosPage() {
@@ -35,29 +34,41 @@ function InvestimentosPage() {
   const qc = useQueryClient();
   const [show, setShow] = useState(false);
   const [editing, setEditing] = useState<Inv | null>(null);
+  const [contribFor, setContribFor] = useState<Inv | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const { data } = useQuery({
     queryKey: ["inv"],
     queryFn: async () => {
-      const [i, a] = await Promise.all([
+      const [i, a, c] = await Promise.all([
         supabase.from("investments").select("*").order("name"),
         supabase.from("accounts").select("id, name").eq("archived", false),
+        supabase.from("investment_contributions" as any).select("*").order("occurred_on", { ascending: false }),
       ]);
-      return { inv: (i.data ?? []) as Inv[], accounts: (a.data ?? []) as Account[] };
+      return {
+        inv: (i.data ?? []) as Inv[],
+        accounts: (a.data ?? []) as Account[],
+        contribs: ((c.data ?? []) as any[]) as Contrib[],
+      };
     },
   });
 
   const inv = data?.inv ?? [];
   const accounts = data?.accounts ?? [];
+  const contribs = data?.contribs ?? [];
 
   const valueOf = (i: Inv) => Number(i.quantity) * Number(i.current_price || i.average_price);
-  const costOf = (i: Inv) => Number(i.quantity) * Number(i.average_price);
+  const aporteOf = (i: Inv) => contribs.filter((c) => c.investment_id === i.id).reduce((s, c) => s + Number(c.amount), 0);
   const total = inv.reduce((s, i) => s + valueOf(i), 0);
-  const cost = inv.reduce((s, i) => s + costOf(i), 0);
-  const pnl = total - cost;
+  const totalAporte = inv.reduce((s, i) => s + aporteOf(i), 0);
+  const pnl = total - totalAporte;
 
   const del = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from("investments").delete().eq("id", id); if (error) throw error; },
+    mutationFn: async (id: string) => {
+      await supabase.from("investment_contributions" as any).delete().eq("investment_id", id);
+      const { error } = await supabase.from("investments").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Removido"); },
   });
 
@@ -67,7 +78,7 @@ function InvestimentosPage() {
 
   return (
     <div>
-      <Header title="Investimentos" subtitle={`Patrimônio investido: ${brl(total)} · Resultado: ${brl(pnl)}`}>
+      <Header title="Investimentos" subtitle={`Patrimônio: ${brl(total)} · Aportado: ${brl(totalAporte)} · Resultado: ${brl(pnl)}`}>
         <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo ativo</button>
       </Header>
 
@@ -89,47 +100,204 @@ function InvestimentosPage() {
         {inv.length === 0 ? (
           <EmptyState text="Adicione seus ativos para acompanhar a carteira." />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-secondary text-xs uppercase tracking-wider text-muted-foreground">
-              <tr><th className="px-5 py-3 text-left">Ativo</th><th className="px-3 py-3 text-right">Detalhes</th><th className="px-3 py-3 text-right">Saldo / Valor</th><th className="px-3 py-3"></th></tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {inv.map((i) => {
-                const isBalance = BALANCE_MODE.has(i.asset_class);
-                const bank = accounts.find((a) => a.id === i.funding_account_id)?.name;
-                return (
-                  <tr key={i.id} className="hover:bg-accent/30">
-                    <td className="px-5 py-3">
-                      <button onClick={() => { setEditing(i); setShow(true); }} className="text-left">
-                        <div className="font-medium">{i.ticker || i.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {CLASSES[i.asset_class]}{i.ticker && i.name ? ` · ${i.name}` : ""}
-                          {bank && <span> · <span className="text-foreground/70">{bank}</span></span>}
-                        </div>
-                      </button>
-                    </td>
-                    <td className="px-3 py-3 text-right text-xs text-muted-foreground">
-                      {isBalance ? (
-                        <span>Aporte: {brl(costOf(i))}</span>
-                      ) : (
-                        <span>{Number(i.quantity).toLocaleString("pt-BR")} × {brl(i.current_price || i.average_price)}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums font-medium">{brl(valueOf(i))}</td>
-                    <td className="px-3 py-3 text-right">
-                      <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Atualizar saldo"><RefreshCw className="h-4 w-4" /></button>
-                      <button onClick={() => confirm("Remover ativo?") && del.mutate(i.id)} className="ml-2 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <ul className="divide-y divide-border">
+            {inv.map((i) => {
+              const bank = accounts.find((a) => a.id === i.funding_account_id)?.name;
+              const myContribs = contribs.filter((c) => c.investment_id === i.id);
+              const aportado = aporteOf(i);
+              const valor = valueOf(i);
+              const open = expanded[i.id];
+              return (
+                <li key={i.id}>
+                  <div className="flex items-center gap-2 px-5 py-3 text-sm">
+                    <button onClick={() => setExpanded({ ...expanded, [i.id]: !open })} className="text-muted-foreground hover:text-foreground">
+                      {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                    <div className="flex-1">
+                      <div className="font-medium">{i.ticker || i.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {CLASSES[i.asset_class]}{i.ticker && i.name ? ` · ${i.name}` : ""}
+                        {bank && <span> · <span className="text-foreground/70">{bank}</span></span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">Aportado {brl(aportado)}</div>
+                      <div className="tabular-nums font-medium">{brl(valor)}</div>
+                    </div>
+                    <button onClick={() => setContribFor(i)} className="ml-2 text-primary hover:underline text-xs whitespace-nowrap">+ Aporte</button>
+                    <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Editar ativo / atualizar saldo"><RefreshCw className="h-4 w-4" /></button>
+                    <button onClick={() => confirm("Remover ativo e todos os aportes?") && del.mutate(i.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                  {open && (
+                    <ContribList inv={i} contribs={myContribs} accounts={accounts} />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
       {show && <InvDialog onClose={() => setShow(false)} userId={user!.id} editing={editing} accounts={accounts} />}
+      {contribFor && <ContribDialog onClose={() => setContribFor(null)} userId={user!.id} inv={contribFor} accounts={accounts} editing={null} />}
     </div>
+  );
+}
+
+function ContribList({ inv, contribs, accounts }: { inv: Inv; contribs: Contrib[]; accounts: Account[] }) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState<Contrib | null>(null);
+  const [showNew, setShowNew] = useState(false);
+
+  const del = useMutation({
+    mutationFn: async (c: Contrib) => {
+      if (c.account_tx_id) {
+        await supabase.from("account_transactions").delete().eq("id", c.account_tx_id);
+      }
+      const { error } = await supabase.from("investment_contributions" as any).delete().eq("id", c.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Aporte removido"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <div className="bg-secondary/20 border-t border-border px-12 py-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">Histórico de aportes ({contribs.length})</span>
+        <button onClick={() => setShowNew(true)} className="text-xs text-primary hover:underline">+ Novo aporte</button>
+      </div>
+      {contribs.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Nenhum aporte registrado.</p>
+      ) : (
+        <ul className="divide-y divide-border/50">
+          {contribs.map((c) => {
+            const acct = accounts.find((a) => a.id === c.funding_account_id)?.name;
+            return (
+              <li key={c.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <div className="tabular-nums font-medium">{brl(c.amount)}</div>
+                  <div className="text-xs text-muted-foreground">{fmtDate(c.occurred_on)}{acct && ` · ${acct}`}{c.notes && ` · ${c.notes}`}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setEdit(c)} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => confirm("Remover este aporte?") && del.mutate(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {showNew && <ContribDialog onClose={() => setShowNew(false)} userId={user!.id} inv={inv} accounts={accounts} editing={null} />}
+      {edit && <ContribDialog onClose={() => setEdit(null)} userId={user!.id} inv={inv} accounts={accounts} editing={edit} />}
+    </div>
+  );
+}
+
+function ContribDialog({ onClose, userId, inv, accounts, editing }: { onClose: () => void; userId: string; inv: Inv; accounts: Account[]; editing: Contrib | null }) {
+  const qc = useQueryClient();
+  const noFunding = NO_FUNDING.has(inv.asset_class);
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
+  const [date, setDate] = useState(editing?.occurred_on ?? new Date().toISOString().slice(0, 10));
+  const [accountId, setAccountId] = useState<string>(editing?.funding_account_id ?? (accounts[0]?.id ?? ""));
+  const [notes, setNotes] = useState(editing?.notes ?? "");
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const amt = Number(amount);
+      if (!amt || amt <= 0) throw new Error("Valor inválido");
+      if (!noFunding && !accountId) throw new Error("Selecione o banco de origem");
+
+      let accountTxId: string | null = editing?.account_tx_id ?? null;
+
+      if (editing) {
+        // Atualiza ou cria/remove lançamento bancário vinculado conforme a classe
+        if (!noFunding && accountId) {
+          if (accountTxId) {
+            const { error } = await supabase.from("account_transactions").update({
+              account_id: accountId, amount: amt, occurred_on: date, description: `Aporte: ${inv.name}`,
+            }).eq("id", accountTxId);
+            if (error) throw error;
+          } else {
+            const { data, error } = await supabase.from("account_transactions").insert({
+              user_id: userId, account_id: accountId, kind: "expense", amount: amt,
+              description: `Aporte: ${inv.name}`, occurred_on: date,
+            }).select("id").single();
+            if (error) throw error;
+            accountTxId = data.id;
+          }
+        } else if (accountTxId) {
+          // mudou para previdência: remove a saída
+          await supabase.from("account_transactions").delete().eq("id", accountTxId);
+          accountTxId = null;
+        }
+
+        const { error } = await supabase.from("investment_contributions" as any).update({
+          amount: amt, occurred_on: date,
+          funding_account_id: noFunding ? null : accountId,
+          account_tx_id: accountTxId, notes: notes || null,
+        }).eq("id", editing.id);
+        if (error) throw error;
+      } else {
+        if (!noFunding && accountId) {
+          const { data, error } = await supabase.from("account_transactions").insert({
+            user_id: userId, account_id: accountId, kind: "expense", amount: amt,
+            description: `Aporte: ${inv.name}`, occurred_on: date,
+          }).select("id").single();
+          if (error) throw error;
+          accountTxId = data.id;
+        }
+
+        const { error } = await supabase.from("investment_contributions" as any).insert({
+          user_id: userId, investment_id: inv.id, amount: amt, occurred_on: date,
+          funding_account_id: noFunding ? null : (accountId || null),
+          account_tx_id: accountTxId, notes: notes || null,
+        });
+        if (error) throw error;
+      }
+
+      // Reflete aporte no investimento (modo saldo): quantidade=1, average_price = soma de aportes
+      if (BALANCE_MODE.has(inv.asset_class)) {
+        const { data: rows } = await supabase.from("investment_contributions" as any).select("amount").eq("investment_id", inv.id);
+        const totalAportes = ((rows ?? []) as any[]).reduce((s: number, r: any) => s + Number(r.amount), 0);
+        const newCurrent = Number(inv.current_price) >= totalAportes ? Number(inv.current_price) : totalAportes;
+        await supabase.from("investments").update({
+          quantity: 1, average_price: totalAportes,
+          current_price: editing ? Number(inv.current_price) : newCurrent,
+          updated_at: new Date().toISOString(),
+        }).eq("id", inv.id);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inv"] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(editing ? "Aporte atualizado" : "Aporte registrado");
+      onClose();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog title={editing ? "Editar aporte" : `Novo aporte — ${inv.name}`} onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
+        <Field label="Valor (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
+        <Field label="Data"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
+        {!noFunding ? (
+          <Field label="Banco de origem (será debitado)">
+            <select required value={accountId} onChange={(e) => setAccountId(e.target.value)} className="input">
+              <option value="">— Selecione —</option>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Field>
+        ) : (
+          <p className="text-xs text-muted-foreground">Previdência privada: o aporte é registrado mas não debita do saldo das contas.</p>
+        )}
+        <Field label="Observação"><input value={notes} onChange={(e) => setNotes(e.target.value)} className="input" placeholder="Opcional" /></Field>
+        <button disabled={save.isPending} className="btn-primary w-full justify-center">{save.isPending ? "Salvando..." : "Salvar"}</button>
+      </form>
+    </Dialog>
   );
 }
 
@@ -141,55 +309,35 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
   const [qty, setQty] = useState(String(editing?.quantity ?? ""));
   const [avg, setAvg] = useState(String(editing?.average_price ?? ""));
   const [cur, setCur] = useState(String(editing?.current_price ?? ""));
-
-  // Modo saldo: balance = saldo atual; aporte = total investido (avg_price)
   const [balance, setBalance] = useState(
     editing && BALANCE_MODE.has(editing.asset_class)
       ? String(Number(editing.quantity) * Number(editing.current_price || editing.average_price))
       : ""
   );
-  const [aporte, setAporte] = useState(
-    editing && BALANCE_MODE.has(editing.asset_class)
-      ? String(Number(editing.quantity) * Number(editing.average_price))
-      : ""
-  );
-
-  const [fundingAccountId, setFundingAccountId] = useState<string>(editing?.funding_account_id ?? (accounts[0]?.id ?? ""));
-  const [debitAccount, setDebitAccount] = useState<boolean>(!editing); // por padrão debita ao criar
+  const [fundingAccountId, setFundingAccountId] = useState<string>(editing?.funding_account_id ?? "");
 
   const isBalanceMode = BALANCE_MODE.has(cls);
-  const hasAccounts = accounts.length > 0;
-  const canDebit = !NO_FUNDING.has(cls) && hasAccounts;
-  const canFund = hasAccounts; // permite informar banco mesmo em previdência
 
   const save = useMutation({
     mutationFn: async () => {
       let payload: any;
-      let newAporte = 0; // valor a ser debitado da conta na criação
-      let oldAporte = 0;
-
-      if (editing) {
-        oldAporte = Number(editing.quantity) * Number(editing.average_price);
-      }
-
       if (isBalanceMode) {
         const bal = Number(balance) || 0;
-        const ap = Number(aporte) || bal;
         payload = {
           user_id: userId, name: name || CLASSES[cls], ticker: ticker || null, asset_class: cls,
-          quantity: 1, average_price: ap, current_price: bal,
-          funding_account_id: canFund ? (fundingAccountId || null) : null,
+          quantity: 1,
+          average_price: editing ? Number(editing.average_price) : bal,
+          current_price: bal,
+          funding_account_id: fundingAccountId || null,
           updated_at: new Date().toISOString(),
         };
-        newAporte = ap;
       } else {
         payload = {
           user_id: userId, name, ticker: ticker || null, asset_class: cls,
           quantity: Number(qty) || 0, average_price: Number(avg) || 0, current_price: Number(cur) || Number(avg) || 0,
-          funding_account_id: canFund ? (fundingAccountId || null) : null,
+          funding_account_id: fundingAccountId || null,
           updated_at: new Date().toISOString(),
         };
-        newAporte = (Number(qty) || 0) * (Number(avg) || 0);
       }
 
       const q = editing
@@ -197,26 +345,10 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
         : supabase.from("investments").insert(payload);
       const { error } = await q;
       if (error) throw error;
-
-      // Cria lançamento de saída na conta (apenas na CRIAÇÃO e quando aplicável)
-      if (!editing && canDebit && debitAccount && fundingAccountId && newAporte > 0) {
-        const { error: txErr } = await supabase.from("account_transactions").insert({
-          user_id: userId,
-          account_id: fundingAccountId,
-          kind: "expense",
-          amount: newAporte,
-          description: `Aporte: ${payload.name}`,
-          occurred_on: new Date().toISOString().slice(0, 10),
-        });
-        if (txErr) throw txErr;
-      }
-
-      void oldAporte;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inv"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      qc.invalidateQueries({ queryKey: ["contas"] });
       toast.success("Salvo"); onClose();
     },
     onError: (e: any) => toast.error(e.message),
@@ -234,11 +366,8 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
 
         {isBalanceMode ? (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Saldo atual (R$)"><input type="number" step="0.01" required value={balance} onChange={(e) => setBalance(e.target.value)} className="input" /></Field>
-              <Field label="Total aportado (R$)"><input type="number" step="0.01" value={aporte} onChange={(e) => setAporte(e.target.value)} className="input" placeholder="Opcional" /></Field>
-            </div>
-            <p className="text-xs text-muted-foreground">A diferença entre saldo atual e aportado é considerada como rendimento.</p>
+            <Field label="Saldo atual (R$)"><input type="number" step="0.01" required value={balance} onChange={(e) => setBalance(e.target.value)} className="input" /></Field>
+            <p className="text-xs text-muted-foreground">Use o botão "+ Aporte" na lista para registrar aportes. O saldo aqui é o valor atual do investimento.</p>
           </>
         ) : (
           <>
@@ -251,26 +380,12 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
           </>
         )}
 
-        {canFund && (
-          <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
-            <Field label="Banco / corretora onde está o investimento">
-              <select value={fundingAccountId} onChange={(e) => setFundingAccountId(e.target.value)} className="input">
-                <option value="">— Não informar —</option>
-                {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </Field>
-            {!editing && canDebit && (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input type="checkbox" checked={debitAccount} onChange={(e) => setDebitAccount(e.target.checked)} />
-                Debitar este valor do saldo da conta agora
-              </label>
-            )}
-          </div>
-        )}
-
-        {NO_FUNDING.has(cls) && (
-          <p className="text-xs text-muted-foreground">Previdência privada soma ao patrimônio, mas não é debitada do saldo das contas.</p>
-        )}
+        <Field label="Banco / corretora onde está o investimento">
+          <select value={fundingAccountId} onChange={(e) => setFundingAccountId(e.target.value)} className="input">
+            <option value="">— Não informar —</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </Field>
 
         <button disabled={save.isPending} className="btn-primary w-full justify-center">{save.isPending ? "Salvando..." : "Salvar"}</button>
       </form>

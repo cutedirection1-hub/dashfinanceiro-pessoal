@@ -20,16 +20,18 @@ export const monthLabel = (iso: string) => {
 };
 
 /**
- * Calcula o mês da fatura para uma compra, dado o dia de fechamento.
- * Se a compra ocorre no dia >= fechamento, vai para o mês seguinte.
- * Recebe a data como YYYY-MM-DD e retorna YYYY-MM-01 (sem shift de timezone).
+ * Regra de fatura:
+ * - Toda compra entra na fatura do MÊS SEGUINTE ao da compra.
+ * - Se a compra ocorrer APÓS o dia de VENCIMENTO, entra no mês seguinte ao seguinte (+2).
+ * Ex.: venc. dia 25. Compra 10/maio → fatura de junho. Compra 28/maio → fatura de julho.
  */
-export function invoiceMonth(purchasedOnIso: string, closingDay: number): string {
+export function invoiceMonth(purchasedOnIso: string, closingDay: number, dueDay?: number): string {
   const [y, m, d] = purchasedOnIso.slice(0, 10).split("-").map(Number);
+  const ref = typeof dueDay === "number" ? dueDay : closingDay;
   let year = y;
-  let monthIdx = (m || 1) - 1;
-  if ((d || 1) > closingDay) monthIdx += 1;
-  if (monthIdx > 11) { monthIdx = 0; year += 1; }
+  let monthIdx = (m || 1) - 1 + 1; // sempre mês seguinte
+  if ((d || 1) > ref) monthIdx += 1; // após vencimento → +1 adicional
+  while (monthIdx > 11) { monthIdx -= 12; year += 1; }
   return `${year}-${String(monthIdx + 1).padStart(2, "0")}-01`;
 }
 

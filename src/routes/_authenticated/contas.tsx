@@ -99,7 +99,7 @@ function ContasPage() {
             <div className="mt-4 text-2xl font-semibold">{brl(balanceOf(a.id))}</div>
           </div>
         ))}
-        {!accounts.length && <EmptyState text="Nenhuma conta cadastrada ainda." />}
+        {!accounts.length && <EmptyState text={showArchived ? "Nenhuma conta arquivada." : "Nenhuma conta cadastrada ainda."} />}
       </div>
 
       {tx.length > 0 && (

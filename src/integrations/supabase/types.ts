@@ -241,8 +241,11 @@ export type Database = {
           funding_account_id: string | null
           id: string
           investment_id: string
+          kind: string
           notes: string | null
           occurred_on: string
+          quantity: number | null
+          unit_price: number | null
           user_id: string
         }
         Insert: {
@@ -252,8 +255,11 @@ export type Database = {
           funding_account_id?: string | null
           id?: string
           investment_id: string
+          kind?: string
           notes?: string | null
           occurred_on?: string
+          quantity?: number | null
+          unit_price?: number | null
           user_id: string
         }
         Update: {
@@ -263,8 +269,11 @@ export type Database = {
           funding_account_id?: string | null
           id?: string
           investment_id?: string
+          kind?: string
           notes?: string | null
           occurred_on?: string
+          quantity?: number | null
+          unit_price?: number | null
           user_id?: string
         }
         Relationships: []

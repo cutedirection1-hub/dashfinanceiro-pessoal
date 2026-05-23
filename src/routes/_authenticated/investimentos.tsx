@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/investimentos")({ componen
 
 type Inv = { id: string; asset_class: string; ticker: string | null; name: string; quantity: number; average_price: number; current_price: number; funding_account_id: string | null };
 type Account = { id: string; name: string };
-type Contrib = { id: string; investment_id: string; amount: number; occurred_on: string; funding_account_id: string | null; account_tx_id: string | null; notes: string | null };
+type Contrib = { id: string; investment_id: string; kind: string; amount: number; quantity: number | null; unit_price: number | null; occurred_on: string; funding_account_id: string | null; account_tx_id: string | null; notes: string | null };
 
 const CLASSES: Record<string, string> = {
   stock: "Ação",
@@ -58,7 +58,7 @@ function InvestimentosPage() {
   const contribs = data?.contribs ?? [];
 
   const valueOf = (i: Inv) => Number(i.quantity) * Number(i.current_price || i.average_price);
-  const aporteOf = (i: Inv) => contribs.filter((c) => c.investment_id === i.id).reduce((s, c) => s + Number(c.amount), 0);
+  const aporteOf = (i: Inv) => contribs.filter((c) => c.investment_id === i.id).reduce((s, c) => s + (c.kind === "resgate" ? -1 : 1) * Number(c.amount), 0);
   const total = inv.reduce((s, i) => s + valueOf(i), 0);
   const totalAporte = inv.reduce((s, i) => s + aporteOf(i), 0);
   const pnl = total - totalAporte;
@@ -139,7 +139,7 @@ function InvestimentosPage() {
       </div>
 
       {show && <InvDialog onClose={() => setShow(false)} userId={user!.id} editing={editing} accounts={accounts} />}
-      {contribFor && <ContribDialog onClose={() => setContribFor(null)} userId={user!.id} inv={contribFor} accounts={accounts} editing={null} />}
+      {contribFor && <ContribDialog onClose={() => setContribFor(null)} userId={user!.id} inv={contribFor} accounts={accounts} editing={null} initialKind="aporte" />}
     </div>
   );
 }
@@ -148,7 +148,7 @@ function ContribList({ inv, contribs, accounts }: { inv: Inv; contribs: Contrib[
   const { user } = useAuth();
   const qc = useQueryClient();
   const [edit, setEdit] = useState<Contrib | null>(null);
-  const [showNew, setShowNew] = useState(false);
+  const [showNew, setShowNew] = useState<"aporte" | "resgate" | null>(null);
 
   const del = useMutation({
     mutationFn: async (c: Contrib) => {
@@ -157,143 +157,210 @@ function ContribList({ inv, contribs, accounts }: { inv: Inv; contribs: Contrib[
       }
       const { error } = await supabase.from("investment_contributions" as any).delete().eq("id", c.id);
       if (error) throw error;
+      await recomputeInvestment(inv);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Aporte removido"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Removido"); },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
     <div className="bg-secondary/20 border-t border-border px-12 py-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Histórico de aportes ({contribs.length})</span>
-        <button onClick={() => setShowNew(true)} className="text-xs text-primary hover:underline">+ Novo aporte</button>
+        <span className="text-xs font-medium text-muted-foreground">Histórico ({contribs.length})</span>
+        <div className="flex gap-2">
+          <button onClick={() => setShowNew("aporte")} className="text-xs text-primary hover:underline">+ Aporte</button>
+          <button onClick={() => setShowNew("resgate")} className="text-xs text-destructive hover:underline">− Resgate</button>
+        </div>
       </div>
       {contribs.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Nenhum aporte registrado.</p>
+        <p className="text-xs text-muted-foreground">Nenhum lançamento registrado.</p>
       ) : (
         <ul className="divide-y divide-border/50">
           {contribs.map((c) => {
             const acct = accounts.find((a) => a.id === c.funding_account_id)?.name;
+            const isResg = c.kind === "resgate";
             return (
               <li key={c.id} className="flex items-center justify-between py-2 text-sm">
                 <div>
-                  <div className="tabular-nums font-medium">{brl(c.amount)}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${isResg ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>{isResg ? "Resgate" : "Aporte"}</span>
+                    <span className={`tabular-nums font-medium ${isResg ? "text-destructive" : ""}`}>{isResg ? "−" : ""}{brl(c.amount)}</span>
+                    {c.quantity != null && c.unit_price != null && (
+                      <span className="text-xs text-muted-foreground">({Number(c.quantity)} × {brl(c.unit_price)})</span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{fmtDate(c.occurred_on)}{acct && ` · ${acct}`}{c.notes && ` · ${c.notes}`}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setEdit(c)} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => confirm("Remover este aporte?") && del.mutate(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => confirm("Remover este lançamento?") && del.mutate(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             );
           })}
         </ul>
       )}
-      {showNew && <ContribDialog onClose={() => setShowNew(false)} userId={user!.id} inv={inv} accounts={accounts} editing={null} />}
-      {edit && <ContribDialog onClose={() => setEdit(null)} userId={user!.id} inv={inv} accounts={accounts} editing={edit} />}
+      {showNew && <ContribDialog onClose={() => setShowNew(null)} userId={user!.id} inv={inv} accounts={accounts} editing={null} initialKind={showNew} />}
+      {edit && <ContribDialog onClose={() => setEdit(null)} userId={user!.id} inv={inv} accounts={accounts} editing={edit} initialKind={edit.kind as any} />}
     </div>
   );
 }
 
-function ContribDialog({ onClose, userId, inv, accounts, editing }: { onClose: () => void; userId: string; inv: Inv; accounts: Account[]; editing: Contrib | null }) {
+async function recomputeInvestment(inv: Inv) {
+  const { data: rows } = await supabase.from("investment_contributions" as any)
+    .select("*").eq("investment_id", inv.id).order("occurred_on");
+  const list = (rows ?? []) as any[];
+  if (BALANCE_MODE.has(inv.asset_class)) {
+    const net = list.reduce((s, r) => s + (r.kind === "resgate" ? -1 : 1) * Number(r.amount), 0);
+    const totalPos = Math.max(net, 0);
+    const newCurrent = Math.max(Number(inv.current_price) || 0, totalPos);
+    await supabase.from("investments").update({
+      quantity: 1, average_price: totalPos, current_price: newCurrent,
+      updated_at: new Date().toISOString(),
+    }).eq("id", inv.id);
+  } else {
+    // Stock-like: walk in order
+    let qty = 0; let invested = 0; let avg = 0; let lastPrice = Number(inv.current_price) || 0;
+    for (const r of list) {
+      const q = Number(r.quantity || 0);
+      const p = Number(r.unit_price || 0);
+      if (p > 0) lastPrice = p;
+      if (r.kind === "resgate") {
+        const sellQty = Math.min(q, qty);
+        invested -= sellQty * avg;
+        qty -= sellQty;
+        if (qty <= 0) { qty = 0; invested = 0; avg = 0; }
+      } else {
+        qty += q;
+        invested += q * p;
+        avg = qty > 0 ? invested / qty : 0;
+      }
+    }
+    await supabase.from("investments").update({
+      quantity: qty, average_price: avg, current_price: lastPrice || avg,
+      updated_at: new Date().toISOString(),
+    }).eq("id", inv.id);
+  }
+}
+
+function ContribDialog({ onClose, userId, inv, accounts, editing, initialKind }: { onClose: () => void; userId: string; inv: Inv; accounts: Account[]; editing: Contrib | null; initialKind: "aporte" | "resgate" }) {
   const qc = useQueryClient();
   const noFunding = NO_FUNDING.has(inv.asset_class);
+  const isStockMode = !BALANCE_MODE.has(inv.asset_class);
+  const [kind, setKind] = useState<"aporte" | "resgate">(((editing?.kind as any) || initialKind) as any);
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
+  const [qty, setQty] = useState(editing?.quantity != null ? String(editing.quantity) : "");
+  const [unitPrice, setUnitPrice] = useState(editing?.unit_price != null ? String(editing.unit_price) : "");
   const [date, setDate] = useState(editing?.occurred_on ?? new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState<string>(editing?.funding_account_id ?? (accounts[0]?.id ?? ""));
   const [notes, setNotes] = useState(editing?.notes ?? "");
 
+  const isResg = kind === "resgate";
+  // Previdência aceita aporte sem debitar, mas resgate deve creditar uma conta
+  const requiresFunding = !noFunding || isResg;
+
+  const computedAmount = isStockMode ? (Number(qty) * Number(unitPrice)) : Number(amount);
+
   const save = useMutation({
     mutationFn: async () => {
-      const amt = Number(amount);
+      const amt = computedAmount;
       if (!amt || amt <= 0) throw new Error("Valor inválido");
-      if (!noFunding && !accountId) throw new Error("Selecione o banco de origem");
+      if (isStockMode && (!Number(qty) || !Number(unitPrice))) throw new Error("Informe quantidade e preço");
+      if (requiresFunding && !accountId) throw new Error("Selecione o banco");
 
+      const txKind = isResg ? "income" : "expense";
+      const desc = `${isResg ? "Resgate" : "Aporte"}: ${inv.name}`;
       let accountTxId: string | null = editing?.account_tx_id ?? null;
 
       if (editing) {
-        // Atualiza ou cria/remove lançamento bancário vinculado conforme a classe
-        if (!noFunding && accountId) {
+        if (requiresFunding && accountId) {
           if (accountTxId) {
             const { error } = await supabase.from("account_transactions").update({
-              account_id: accountId, amount: amt, occurred_on: date, description: `Aporte: ${inv.name}`,
+              account_id: accountId, amount: amt, occurred_on: date, description: desc, kind: txKind,
             }).eq("id", accountTxId);
             if (error) throw error;
           } else {
             const { data, error } = await supabase.from("account_transactions").insert({
-              user_id: userId, account_id: accountId, kind: "expense", amount: amt,
-              description: `Aporte: ${inv.name}`, occurred_on: date,
+              user_id: userId, account_id: accountId, kind: txKind, amount: amt, description: desc, occurred_on: date,
             }).select("id").single();
             if (error) throw error;
             accountTxId = data.id;
           }
         } else if (accountTxId) {
-          // mudou para previdência: remove a saída
           await supabase.from("account_transactions").delete().eq("id", accountTxId);
           accountTxId = null;
         }
 
         const { error } = await supabase.from("investment_contributions" as any).update({
-          amount: amt, occurred_on: date,
-          funding_account_id: noFunding ? null : accountId,
+          kind, amount: amt, quantity: isStockMode ? Number(qty) : null, unit_price: isStockMode ? Number(unitPrice) : null,
+          occurred_on: date,
+          funding_account_id: requiresFunding ? accountId : null,
           account_tx_id: accountTxId, notes: notes || null,
         }).eq("id", editing.id);
         if (error) throw error;
       } else {
-        if (!noFunding && accountId) {
+        if (requiresFunding && accountId) {
           const { data, error } = await supabase.from("account_transactions").insert({
-            user_id: userId, account_id: accountId, kind: "expense", amount: amt,
-            description: `Aporte: ${inv.name}`, occurred_on: date,
+            user_id: userId, account_id: accountId, kind: txKind, amount: amt, description: desc, occurred_on: date,
           }).select("id").single();
           if (error) throw error;
           accountTxId = data.id;
         }
 
         const { error } = await supabase.from("investment_contributions" as any).insert({
-          user_id: userId, investment_id: inv.id, amount: amt, occurred_on: date,
-          funding_account_id: noFunding ? null : (accountId || null),
+          user_id: userId, investment_id: inv.id, kind, amount: amt,
+          quantity: isStockMode ? Number(qty) : null, unit_price: isStockMode ? Number(unitPrice) : null,
+          occurred_on: date, funding_account_id: requiresFunding ? accountId : null,
           account_tx_id: accountTxId, notes: notes || null,
         });
         if (error) throw error;
       }
 
-      // Reflete aporte no investimento (modo saldo): quantidade=1, average_price = soma de aportes
-      if (BALANCE_MODE.has(inv.asset_class)) {
-        const { data: rows } = await supabase.from("investment_contributions" as any).select("amount").eq("investment_id", inv.id);
-        const totalAportes = ((rows ?? []) as any[]).reduce((s: number, r: any) => s + Number(r.amount), 0);
-        const newCurrent = Number(inv.current_price) >= totalAportes ? Number(inv.current_price) : totalAportes;
-        await supabase.from("investments").update({
-          quantity: 1, average_price: totalAportes,
-          current_price: editing ? Number(inv.current_price) : newCurrent,
-          updated_at: new Date().toISOString(),
-        }).eq("id", inv.id);
-      }
+      await recomputeInvestment(inv);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inv"] });
       qc.invalidateQueries({ queryKey: ["contas"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success(editing ? "Aporte atualizado" : "Aporte registrado");
+      toast.success("Salvo");
       onClose();
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Dialog title={editing ? "Editar aporte" : `Novo aporte — ${inv.name}`} onClose={onClose}>
+    <Dialog title={`${editing ? "Editar" : "Novo"} ${isResg ? "resgate" : "aporte"} — ${inv.name}`} onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
-        <Field label="Valor (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setKind("aporte")} className={`rounded-lg px-3 py-2 text-sm ${!isResg ? "bg-primary/20 text-primary ring-1 ring-primary/40" : "bg-secondary"}`}>Aporte</button>
+          <button type="button" onClick={() => setKind("resgate")} className={`rounded-lg px-3 py-2 text-sm ${isResg ? "bg-destructive/20 text-destructive ring-1 ring-destructive/40" : "bg-secondary"}`}>Resgate</button>
+        </div>
+
+        {isStockMode ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Quantidade"><input type="number" step="0.00000001" required value={qty} onChange={(e) => setQty(e.target.value)} className="input" /></Field>
+              <Field label="Preço unitário (R$)"><input type="number" step="0.01" required value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="input" /></Field>
+            </div>
+            <p className="text-xs text-muted-foreground">Valor total: {brl(computedAmount)}</p>
+          </>
+        ) : (
+          <Field label="Valor (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
+        )}
+
         <Field label="Data"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
-        {!noFunding ? (
-          <Field label="Banco de origem (será debitado)">
+
+        {requiresFunding ? (
+          <Field label={isResg ? "Banco de destino (será creditado)" : "Banco de origem (será debitado)"}>
             <select required value={accountId} onChange={(e) => setAccountId(e.target.value)} className="input">
               <option value="">— Selecione —</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </Field>
         ) : (
-          <p className="text-xs text-muted-foreground">Previdência privada: o aporte é registrado mas não debita do saldo das contas.</p>
+          <p className="text-xs text-muted-foreground">Previdência privada: aporte registrado sem debitar contas.</p>
         )}
+
         <Field label="Observação"><input value={notes} onChange={(e) => setNotes(e.target.value)} className="input" placeholder="Opcional" /></Field>
         <button disabled={save.isPending} className="btn-primary w-full justify-center">{save.isPending ? "Salvando..." : "Salvar"}</button>
       </form>

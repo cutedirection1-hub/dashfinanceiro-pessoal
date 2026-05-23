@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, addMonths, monthLabel } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });
@@ -27,12 +27,13 @@ function CartoesPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
   const [payerFilter, setPayerFilter] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["cartoes"],
+    queryKey: ["cartoes", showArchived],
     queryFn: async () => {
       const [c, t] = await Promise.all([
-        supabase.from("credit_cards").select("*").eq("archived", false).order("created_at"),
+        supabase.from("credit_cards").select("*").eq("archived", showArchived).order("created_at"),
         supabase.from("card_transactions").select("*").order("purchased_on", { ascending: false }),
       ]);
       return { cards: (c.data ?? []) as Card[], tx: (t.data ?? []) as CTx[] };
@@ -62,8 +63,10 @@ function CartoesPage() {
   const payersList = Object.entries(byPayer).sort((a, b) => b[1] - a[1]);
 
   const delCard = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from("credit_cards").update({ archived: true }).eq("id", id); if (error) throw error; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success("Cartão arquivado"); },
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      const { error } = await supabase.from("credit_cards").update({ archived }).eq("id", id); if (error) throw error;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success(v.archived ? "Cartão arquivado" : "Cartão restaurado"); },
   });
 
   const delTx = useMutation({
@@ -108,6 +111,7 @@ function CartoesPage() {
   return (
     <div>
       <Header title="Cartões de crédito">
+        <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
         <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
         <button onClick={() => { setEditCard(null); setShowCard(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo cartão</button>
       </Header>
@@ -128,7 +132,11 @@ function CartoesPage() {
                 </div>
                 <div className="flex gap-1">
                   <button onClick={(e) => { e.stopPropagation(); setEditCard(c); setShowCard(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); if (confirm("Arquivar cartão?")) delCard.mutate(c.id); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  {showArchived ? (
+                    <button title="Restaurar" onClick={(e) => { e.stopPropagation(); delCard.mutate({ id: c.id, archived: false }); }} className="text-muted-foreground hover:text-primary"><ArchiveRestore className="h-4 w-4" /></button>
+                  ) : (
+                    <button title="Arquivar" onClick={(e) => { e.stopPropagation(); if (confirm("Arquivar cartão?")) delCard.mutate({ id: c.id, archived: true }); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  )}
                 </div>
               </div>
               <div className="mt-4">
@@ -146,7 +154,7 @@ function CartoesPage() {
             </div>
           );
         })}
-        {!cards.length && <EmptyState text="Cadastre seu primeiro cartão para começar." />}
+        {!cards.length && <EmptyState text={showArchived ? "Nenhum cartão arquivado." : "Cadastre seu primeiro cartão para começar."} />}
       </div>
 
       {activeCard && (

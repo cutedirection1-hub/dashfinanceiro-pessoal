@@ -27,12 +27,13 @@ function CartoesPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
   const [payerFilter, setPayerFilter] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["cartoes"],
+    queryKey: ["cartoes", showArchived],
     queryFn: async () => {
       const [c, t] = await Promise.all([
-        supabase.from("credit_cards").select("*").eq("archived", false).order("created_at"),
+        supabase.from("credit_cards").select("*").eq("archived", showArchived).order("created_at"),
         supabase.from("card_transactions").select("*").order("purchased_on", { ascending: false }),
       ]);
       return { cards: (c.data ?? []) as Card[], tx: (t.data ?? []) as CTx[] };

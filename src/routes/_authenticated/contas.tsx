@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive } from "lucide-react";
+import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/contas")({ component: ContasPage });
 

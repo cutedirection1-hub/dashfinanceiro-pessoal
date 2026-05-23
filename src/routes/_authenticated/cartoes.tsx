@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, addMonths, monthLabel } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });

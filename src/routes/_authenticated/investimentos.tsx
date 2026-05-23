@@ -58,7 +58,7 @@ function InvestimentosPage() {
   const contribs = data?.contribs ?? [];
 
   const valueOf = (i: Inv) => Number(i.quantity) * Number(i.current_price || i.average_price);
-  const aporteOf = (i: Inv) => contribs.filter((c) => c.investment_id === i.id).reduce((s, c) => s + Number(c.amount), 0);
+  const aporteOf = (i: Inv) => contribs.filter((c) => c.investment_id === i.id).reduce((s, c) => s + (c.kind === "resgate" ? -1 : 1) * Number(c.amount), 0);
   const total = inv.reduce((s, i) => s + valueOf(i), 0);
   const totalAporte = inv.reduce((s, i) => s + aporteOf(i), 0);
   const pnl = total - totalAporte;

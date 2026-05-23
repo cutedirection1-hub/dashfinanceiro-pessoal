@@ -243,105 +243,124 @@ async function recomputeInvestment(inv: Inv) {
   }
 }
 
-function ContribDialog({ onClose, userId, inv, accounts, editing }: { onClose: () => void; userId: string; inv: Inv; accounts: Account[]; editing: Contrib | null }) {
+function ContribDialog({ onClose, userId, inv, accounts, editing, initialKind }: { onClose: () => void; userId: string; inv: Inv; accounts: Account[]; editing: Contrib | null; initialKind: "aporte" | "resgate" }) {
   const qc = useQueryClient();
   const noFunding = NO_FUNDING.has(inv.asset_class);
+  const isStockMode = !BALANCE_MODE.has(inv.asset_class);
+  const [kind, setKind] = useState<"aporte" | "resgate">(((editing?.kind as any) || initialKind) as any);
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
+  const [qty, setQty] = useState(editing?.quantity != null ? String(editing.quantity) : "");
+  const [unitPrice, setUnitPrice] = useState(editing?.unit_price != null ? String(editing.unit_price) : "");
   const [date, setDate] = useState(editing?.occurred_on ?? new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState<string>(editing?.funding_account_id ?? (accounts[0]?.id ?? ""));
   const [notes, setNotes] = useState(editing?.notes ?? "");
 
+  const isResg = kind === "resgate";
+  // Previdência aceita aporte sem debitar, mas resgate deve creditar uma conta
+  const requiresFunding = !noFunding || isResg;
+
+  const computedAmount = isStockMode ? (Number(qty) * Number(unitPrice)) : Number(amount);
+
   const save = useMutation({
     mutationFn: async () => {
-      const amt = Number(amount);
+      const amt = computedAmount;
       if (!amt || amt <= 0) throw new Error("Valor inválido");
-      if (!noFunding && !accountId) throw new Error("Selecione o banco de origem");
+      if (isStockMode && (!Number(qty) || !Number(unitPrice))) throw new Error("Informe quantidade e preço");
+      if (requiresFunding && !accountId) throw new Error("Selecione o banco");
 
+      const txKind = isResg ? "income" : "expense";
+      const desc = `${isResg ? "Resgate" : "Aporte"}: ${inv.name}`;
       let accountTxId: string | null = editing?.account_tx_id ?? null;
 
       if (editing) {
-        // Atualiza ou cria/remove lançamento bancário vinculado conforme a classe
-        if (!noFunding && accountId) {
+        if (requiresFunding && accountId) {
           if (accountTxId) {
             const { error } = await supabase.from("account_transactions").update({
-              account_id: accountId, amount: amt, occurred_on: date, description: `Aporte: ${inv.name}`,
+              account_id: accountId, amount: amt, occurred_on: date, description: desc, kind: txKind,
             }).eq("id", accountTxId);
             if (error) throw error;
           } else {
             const { data, error } = await supabase.from("account_transactions").insert({
-              user_id: userId, account_id: accountId, kind: "expense", amount: amt,
-              description: `Aporte: ${inv.name}`, occurred_on: date,
+              user_id: userId, account_id: accountId, kind: txKind, amount: amt, description: desc, occurred_on: date,
             }).select("id").single();
             if (error) throw error;
             accountTxId = data.id;
           }
         } else if (accountTxId) {
-          // mudou para previdência: remove a saída
           await supabase.from("account_transactions").delete().eq("id", accountTxId);
           accountTxId = null;
         }
 
         const { error } = await supabase.from("investment_contributions" as any).update({
-          amount: amt, occurred_on: date,
-          funding_account_id: noFunding ? null : accountId,
+          kind, amount: amt, quantity: isStockMode ? Number(qty) : null, unit_price: isStockMode ? Number(unitPrice) : null,
+          occurred_on: date,
+          funding_account_id: requiresFunding ? accountId : null,
           account_tx_id: accountTxId, notes: notes || null,
         }).eq("id", editing.id);
         if (error) throw error;
       } else {
-        if (!noFunding && accountId) {
+        if (requiresFunding && accountId) {
           const { data, error } = await supabase.from("account_transactions").insert({
-            user_id: userId, account_id: accountId, kind: "expense", amount: amt,
-            description: `Aporte: ${inv.name}`, occurred_on: date,
+            user_id: userId, account_id: accountId, kind: txKind, amount: amt, description: desc, occurred_on: date,
           }).select("id").single();
           if (error) throw error;
           accountTxId = data.id;
         }
 
         const { error } = await supabase.from("investment_contributions" as any).insert({
-          user_id: userId, investment_id: inv.id, amount: amt, occurred_on: date,
-          funding_account_id: noFunding ? null : (accountId || null),
+          user_id: userId, investment_id: inv.id, kind, amount: amt,
+          quantity: isStockMode ? Number(qty) : null, unit_price: isStockMode ? Number(unitPrice) : null,
+          occurred_on: date, funding_account_id: requiresFunding ? accountId : null,
           account_tx_id: accountTxId, notes: notes || null,
         });
         if (error) throw error;
       }
 
-      // Reflete aporte no investimento (modo saldo): quantidade=1, average_price = soma de aportes
-      if (BALANCE_MODE.has(inv.asset_class)) {
-        const { data: rows } = await supabase.from("investment_contributions" as any).select("amount").eq("investment_id", inv.id);
-        const totalAportes = ((rows ?? []) as any[]).reduce((s: number, r: any) => s + Number(r.amount), 0);
-        const newCurrent = Number(inv.current_price) >= totalAportes ? Number(inv.current_price) : totalAportes;
-        await supabase.from("investments").update({
-          quantity: 1, average_price: totalAportes,
-          current_price: editing ? Number(inv.current_price) : newCurrent,
-          updated_at: new Date().toISOString(),
-        }).eq("id", inv.id);
-      }
+      await recomputeInvestment(inv);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inv"] });
       qc.invalidateQueries({ queryKey: ["contas"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success(editing ? "Aporte atualizado" : "Aporte registrado");
+      toast.success("Salvo");
       onClose();
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Dialog title={editing ? "Editar aporte" : `Novo aporte — ${inv.name}`} onClose={onClose}>
+    <Dialog title={`${editing ? "Editar" : "Novo"} ${isResg ? "resgate" : "aporte"} — ${inv.name}`} onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
-        <Field label="Valor (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setKind("aporte")} className={`rounded-lg px-3 py-2 text-sm ${!isResg ? "bg-primary/20 text-primary ring-1 ring-primary/40" : "bg-secondary"}`}>Aporte</button>
+          <button type="button" onClick={() => setKind("resgate")} className={`rounded-lg px-3 py-2 text-sm ${isResg ? "bg-destructive/20 text-destructive ring-1 ring-destructive/40" : "bg-secondary"}`}>Resgate</button>
+        </div>
+
+        {isStockMode ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Quantidade"><input type="number" step="0.00000001" required value={qty} onChange={(e) => setQty(e.target.value)} className="input" /></Field>
+              <Field label="Preço unitário (R$)"><input type="number" step="0.01" required value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="input" /></Field>
+            </div>
+            <p className="text-xs text-muted-foreground">Valor total: {brl(computedAmount)}</p>
+          </>
+        ) : (
+          <Field label="Valor (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
+        )}
+
         <Field label="Data"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
-        {!noFunding ? (
-          <Field label="Banco de origem (será debitado)">
+
+        {requiresFunding ? (
+          <Field label={isResg ? "Banco de destino (será creditado)" : "Banco de origem (será debitado)"}>
             <select required value={accountId} onChange={(e) => setAccountId(e.target.value)} className="input">
               <option value="">— Selecione —</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </Field>
         ) : (
-          <p className="text-xs text-muted-foreground">Previdência privada: o aporte é registrado mas não debita do saldo das contas.</p>
+          <p className="text-xs text-muted-foreground">Previdência privada: aporte registrado sem debitar contas.</p>
         )}
+
         <Field label="Observação"><input value={notes} onChange={(e) => setNotes(e.target.value)} className="input" placeholder="Opcional" /></Field>
         <button disabled={save.isPending} className="btn-primary w-full justify-center">{save.isPending ? "Salvando..." : "Salvar"}</button>
       </form>

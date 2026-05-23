@@ -88,7 +88,11 @@ function ContasPage() {
                 <p className="text-xs text-muted-foreground">{a.bank || a.type}</p>
               </div>
               <div className="flex gap-1">
-                <button title="Arquivar" onClick={() => confirm("Arquivar essa conta? Os lançamentos serão mantidos.") && archive.mutate(a.id)} className="text-muted-foreground hover:text-primary"><Archive className="h-4 w-4" /></button>
+                {showArchived ? (
+                  <button title="Restaurar" onClick={() => archive.mutate({ id: a.id, archived: false })} className="text-muted-foreground hover:text-primary"><ArchiveRestore className="h-4 w-4" /></button>
+                ) : (
+                  <button title="Arquivar" onClick={() => confirm("Arquivar essa conta? Os lançamentos serão mantidos.") && archive.mutate({ id: a.id, archived: true })} className="text-muted-foreground hover:text-primary"><Archive className="h-4 w-4" /></button>
+                )}
                 <button title="Excluir conta e lançamentos" onClick={() => confirm("EXCLUIR essa conta e TODOS os seus lançamentos? Esta ação não pode ser desfeita.") && delAccount.mutate(a.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>

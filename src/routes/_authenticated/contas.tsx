@@ -18,12 +18,13 @@ function ContasPage() {
   const [showAcct, setShowAcct] = useState(false);
   const [showTx, setShowTx] = useState(false);
   const [editTx, setEditTx] = useState<Tx | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["contas"],
+    queryKey: ["contas", showArchived],
     queryFn: async () => {
       const [a, t] = await Promise.all([
-        supabase.from("accounts").select("*").eq("archived", false).order("created_at"),
+        supabase.from("accounts").select("*").eq("archived", showArchived).order("created_at"),
         supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(100),
       ]);
       return { accounts: (a.data ?? []) as Account[], tx: (t.data ?? []) as Tx[] };
@@ -43,8 +44,11 @@ function ContasPage() {
   const total = accounts.reduce((s, a) => s + balanceOf(a.id), 0);
 
   const archive = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from("accounts").update({ archived: true }).eq("id", id); if (error) throw error; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success("Conta arquivada"); },
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      const { error } = await supabase.from("accounts").update({ archived }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success(v.archived ? "Conta arquivada" : "Conta restaurada"); },
   });
 
   const delAccount = useMutation({

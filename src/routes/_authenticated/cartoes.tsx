@@ -154,7 +154,7 @@ function CartoesPage() {
             </div>
           );
         })}
-        {!cards.length && <EmptyState text="Cadastre seu primeiro cartão para começar." />}
+        {!cards.length && <EmptyState text={showArchived ? "Nenhum cartão arquivado." : "Cadastre seu primeiro cartão para começar."} />}
       </div>
 
       {activeCard && (

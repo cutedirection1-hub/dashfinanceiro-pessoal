@@ -63,8 +63,10 @@ function CartoesPage() {
   const payersList = Object.entries(byPayer).sort((a, b) => b[1] - a[1]);
 
   const delCard = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from("credit_cards").update({ archived: true }).eq("id", id); if (error) throw error; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success("Cartão arquivado"); },
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      const { error } = await supabase.from("credit_cards").update({ archived }).eq("id", id); if (error) throw error;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); toast.success(v.archived ? "Cartão arquivado" : "Cartão restaurado"); },
   });
 
   const delTx = useMutation({

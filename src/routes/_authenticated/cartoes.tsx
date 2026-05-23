@@ -132,7 +132,11 @@ function CartoesPage() {
                 </div>
                 <div className="flex gap-1">
                   <button onClick={(e) => { e.stopPropagation(); setEditCard(c); setShowCard(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); if (confirm("Arquivar cartão?")) delCard.mutate(c.id); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  {showArchived ? (
+                    <button title="Restaurar" onClick={(e) => { e.stopPropagation(); delCard.mutate({ id: c.id, archived: false }); }} className="text-muted-foreground hover:text-primary"><ArchiveRestore className="h-4 w-4" /></button>
+                  ) : (
+                    <button title="Arquivar" onClick={(e) => { e.stopPropagation(); if (confirm("Arquivar cartão?")) delCard.mutate({ id: c.id, archived: true }); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  )}
                 </div>
               </div>
               <div className="mt-4">

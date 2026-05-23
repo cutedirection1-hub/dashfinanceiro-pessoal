@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/investimentos")({ componen
 
 type Inv = { id: string; asset_class: string; ticker: string | null; name: string; quantity: number; average_price: number; current_price: number; funding_account_id: string | null };
 type Account = { id: string; name: string };
-type Contrib = { id: string; investment_id: string; amount: number; occurred_on: string; funding_account_id: string | null; account_tx_id: string | null; notes: string | null };
+type Contrib = { id: string; investment_id: string; kind: string; amount: number; quantity: number | null; unit_price: number | null; occurred_on: string; funding_account_id: string | null; account_tx_id: string | null; notes: string | null };
 
 const CLASSES: Record<string, string> = {
   stock: "Ação",

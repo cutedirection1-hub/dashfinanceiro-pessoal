@@ -148,7 +148,7 @@ function ContribList({ inv, contribs, accounts }: { inv: Inv; contribs: Contrib[
   const { user } = useAuth();
   const qc = useQueryClient();
   const [edit, setEdit] = useState<Contrib | null>(null);
-  const [showNew, setShowNew] = useState(false);
+  const [showNew, setShowNew] = useState<"aporte" | "resgate" | null>(null);
 
   const del = useMutation({
     mutationFn: async (c: Contrib) => {
@@ -157,42 +157,90 @@ function ContribList({ inv, contribs, accounts }: { inv: Inv; contribs: Contrib[
       }
       const { error } = await supabase.from("investment_contributions" as any).delete().eq("id", c.id);
       if (error) throw error;
+      await recomputeInvestment(inv);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Aporte removido"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Removido"); },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
     <div className="bg-secondary/20 border-t border-border px-12 py-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Histórico de aportes ({contribs.length})</span>
-        <button onClick={() => setShowNew(true)} className="text-xs text-primary hover:underline">+ Novo aporte</button>
+        <span className="text-xs font-medium text-muted-foreground">Histórico ({contribs.length})</span>
+        <div className="flex gap-2">
+          <button onClick={() => setShowNew("aporte")} className="text-xs text-primary hover:underline">+ Aporte</button>
+          <button onClick={() => setShowNew("resgate")} className="text-xs text-destructive hover:underline">− Resgate</button>
+        </div>
       </div>
       {contribs.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Nenhum aporte registrado.</p>
+        <p className="text-xs text-muted-foreground">Nenhum lançamento registrado.</p>
       ) : (
         <ul className="divide-y divide-border/50">
           {contribs.map((c) => {
             const acct = accounts.find((a) => a.id === c.funding_account_id)?.name;
+            const isResg = c.kind === "resgate";
             return (
               <li key={c.id} className="flex items-center justify-between py-2 text-sm">
                 <div>
-                  <div className="tabular-nums font-medium">{brl(c.amount)}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${isResg ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}>{isResg ? "Resgate" : "Aporte"}</span>
+                    <span className={`tabular-nums font-medium ${isResg ? "text-destructive" : ""}`}>{isResg ? "−" : ""}{brl(c.amount)}</span>
+                    {c.quantity != null && c.unit_price != null && (
+                      <span className="text-xs text-muted-foreground">({Number(c.quantity)} × {brl(c.unit_price)})</span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{fmtDate(c.occurred_on)}{acct && ` · ${acct}`}{c.notes && ` · ${c.notes}`}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setEdit(c)} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => confirm("Remover este aporte?") && del.mutate(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => confirm("Remover este lançamento?") && del.mutate(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </li>
             );
           })}
         </ul>
       )}
-      {showNew && <ContribDialog onClose={() => setShowNew(false)} userId={user!.id} inv={inv} accounts={accounts} editing={null} />}
-      {edit && <ContribDialog onClose={() => setEdit(null)} userId={user!.id} inv={inv} accounts={accounts} editing={edit} />}
+      {showNew && <ContribDialog onClose={() => setShowNew(null)} userId={user!.id} inv={inv} accounts={accounts} editing={null} initialKind={showNew} />}
+      {edit && <ContribDialog onClose={() => setEdit(null)} userId={user!.id} inv={inv} accounts={accounts} editing={edit} initialKind={edit.kind as any} />}
     </div>
   );
+}
+
+async function recomputeInvestment(inv: Inv) {
+  const { data: rows } = await supabase.from("investment_contributions" as any)
+    .select("*").eq("investment_id", inv.id).order("occurred_on");
+  const list = (rows ?? []) as any[];
+  if (BALANCE_MODE.has(inv.asset_class)) {
+    const net = list.reduce((s, r) => s + (r.kind === "resgate" ? -1 : 1) * Number(r.amount), 0);
+    const totalPos = Math.max(net, 0);
+    const newCurrent = Math.max(Number(inv.current_price) || 0, totalPos);
+    await supabase.from("investments").update({
+      quantity: 1, average_price: totalPos, current_price: newCurrent,
+      updated_at: new Date().toISOString(),
+    }).eq("id", inv.id);
+  } else {
+    // Stock-like: walk in order
+    let qty = 0; let invested = 0; let avg = 0; let lastPrice = Number(inv.current_price) || 0;
+    for (const r of list) {
+      const q = Number(r.quantity || 0);
+      const p = Number(r.unit_price || 0);
+      if (p > 0) lastPrice = p;
+      if (r.kind === "resgate") {
+        const sellQty = Math.min(q, qty);
+        invested -= sellQty * avg;
+        qty -= sellQty;
+        if (qty <= 0) { qty = 0; invested = 0; avg = 0; }
+      } else {
+        qty += q;
+        invested += q * p;
+        avg = qty > 0 ? invested / qty : 0;
+      }
+    }
+    await supabase.from("investments").update({
+      quantity: qty, average_price: avg, current_price: lastPrice || avg,
+      updated_at: new Date().toISOString(),
+    }).eq("id", inv.id);
+  }
 }
 
 function ContribDialog({ onClose, userId, inv, accounts, editing }: { onClose: () => void; userId: string; inv: Inv; accounts: Account[]; editing: Contrib | null }) {

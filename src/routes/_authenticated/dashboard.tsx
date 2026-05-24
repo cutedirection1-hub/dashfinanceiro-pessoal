@@ -86,7 +86,7 @@ function DashboardPage() {
 
   // Evolução: últimos 6 meses a partir do mês selecionado
   const chart: { mes: string; gasto: number; patrimonio: number; investimentos: number }[] = [];
-  const investTotalNow = investTotal; // snapshot atual de investimentos
+  void investTotal;
   for (let i = 5; i >= 0; i--) {
     const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
     const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);

@@ -312,7 +312,7 @@ function DeletePermDialog({ card, txCount, txTotal, onClose, onConfirm, pending 
   );
 }
 
-function ImportCsvDialog({ allCards, onClose, userId }: { cards: Card[]; allCards: Card[]; onClose: () => void; userId: string }) {
+function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onClose: () => void; userId: string }) {
   const qc = useQueryClient();
   const [step, setStep] = useState<"upload" | "map">("upload");
   const [cardId, setCardId] = useState(allCards[0]?.id ?? "");

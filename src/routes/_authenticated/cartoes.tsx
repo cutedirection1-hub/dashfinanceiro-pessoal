@@ -274,7 +274,195 @@ function CartoesPage() {
 
       {showCard && <CardDialog onClose={() => { setShowCard(false); setEditCard(null); }} userId={user!.id} editing={editCard} />}
       {showTx && <CardTxDialog cards={cards} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
+      {showImport && <ImportCsvDialog cards={cards.length ? cards : []} allCards={cards} onClose={() => setShowImport(false)} userId={user!.id} />}
+      {deletePermCard && (
+        <DeletePermDialog
+          card={deletePermCard}
+          txCount={tx.filter((t) => t.card_id === deletePermCard.id).length}
+          txTotal={tx.filter((t) => t.card_id === deletePermCard.id).reduce((s, t) => s + Number(t.amount), 0)}
+          onClose={() => setDeletePermCard(null)}
+          onConfirm={() => deletePerm.mutate(deletePermCard)}
+          pending={deletePerm.isPending}
+        />
+      )}
     </div>
+  );
+}
+
+function DeletePermDialog({ card, txCount, txTotal, onClose, onConfirm, pending }: { card: Card; txCount: number; txTotal: number; onClose: () => void; onConfirm: () => void; pending: boolean }) {
+  return (
+    <Dialog title="Excluir cartão permanentemente" onClose={onClose}>
+      <div className="space-y-3 text-sm">
+        <p>Você está prestes a excluir <span className="font-semibold">{card.name}</span>.</p>
+        {txCount > 0 ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+            ⚠️ Este cartão possui <span className="font-semibold">{txCount}</span> lançamento(s) no histórico de faturas, totalizando <span className="font-semibold">{brl(txTotal)}</span>.
+            <div className="mt-1 text-xs">Todas essas compras serão excluídas permanentemente e não aparecerão mais em nenhum relatório.</div>
+          </div>
+        ) : (
+          <p className="text-muted-foreground">Nenhuma compra vinculada — exclusão é segura.</p>
+        )}
+        <p className="text-xs text-muted-foreground">Esta ação não pode ser desfeita.</p>
+        <div className="flex gap-2 pt-2">
+          <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
+          <button type="button" onClick={onConfirm} disabled={pending} className="btn-primary flex-1 justify-center bg-destructive hover:bg-destructive/90">{pending ? "Excluindo..." : "Excluir tudo"}</button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function ImportCsvDialog({ allCards, onClose, userId }: { cards: Card[]; allCards: Card[]; onClose: () => void; userId: string }) {
+  const qc = useQueryClient();
+  const [step, setStep] = useState<"upload" | "map">("upload");
+  const [cardId, setCardId] = useState(allCards[0]?.id ?? "");
+  const [defaultPayer, setDefaultPayer] = useState("Eu");
+  const [rows, setRows] = useState<string[][]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [dateCol, setDateCol] = useState<number>(-1);
+  const [descCol, setDescCol] = useState<number>(-1);
+  const [amtCol, setAmtCol] = useState<number>(-1);
+  const [payerCol, setPayerCol] = useState<number>(-1);
+  const [invertSign, setInvertSign] = useState(false);
+
+  const onFile = async (f: File) => {
+    const text = await f.text();
+    const all = parseCSV(text);
+    if (!all.length) { toast.error("CSV vazio"); return; }
+    const head = all[0].map((h) => h.trim());
+    setHeaders(head);
+    setRows(all.slice(1));
+    // auto-detectar colunas
+    const find = (kw: string[]) => head.findIndex((h) => kw.some((k) => h.toLowerCase().includes(k)));
+    setDateCol(find(["data", "date"]));
+    setDescCol(find(["desc", "histor", "estabel", "merchant", "lançamento", "lancamento"]));
+    setAmtCol(find(["valor", "amount", "montante", "r$"]));
+    setPayerCol(find(["resp", "titular", "portador"]));
+    setStep("map");
+  };
+
+  const card = allCards.find((c) => c.id === cardId);
+  const preview = useMemo(() => {
+    if (!card || dateCol < 0 || amtCol < 0) return [];
+    return rows.slice(0, 10).map((r) => {
+      const date = parseDateBR(r[dateCol] || "");
+      let amt = parseMoney(r[amtCol] || "");
+      if (amt != null && invertSign) amt = -amt;
+      return {
+        date, desc: r[descCol] || "", amount: amt,
+        payer: payerCol >= 0 ? (r[payerCol] || defaultPayer) : defaultPayer,
+        invoice: date ? invoiceMonth(date, card.closing_day, card.due_day) : null,
+      };
+    });
+  }, [rows, card, dateCol, descCol, amtCol, payerCol, defaultPayer, invertSign]);
+
+  const importAll = useMutation({
+    mutationFn: async () => {
+      if (!card) throw new Error("Selecione um cartão");
+      if (dateCol < 0 || amtCol < 0) throw new Error("Mapeie ao menos Data e Valor");
+      const payload: any[] = [];
+      let skipped = 0;
+      for (const r of rows) {
+        const date = parseDateBR(r[dateCol] || "");
+        let amt = parseMoney(r[amtCol] || "");
+        if (!date || amt == null || amt === 0) { skipped++; continue; }
+        if (invertSign) amt = -amt;
+        // só compras positivas; estornos (negativos) viram lançamentos negativos (são considerados na fatura)
+        payload.push({
+          user_id: userId, card_id: card.id, group_id: crypto.randomUUID(),
+          amount: amt, description: (r[descCol] || "Importado").slice(0, 200),
+          purchased_on: date, installment_no: 1, installment_total: 1,
+          invoice_month: invoiceMonth(date, card.closing_day, card.due_day),
+          payer_name: (payerCol >= 0 ? r[payerCol] : defaultPayer)?.trim() || null,
+          recurrence: "none",
+        });
+      }
+      if (!payload.length) throw new Error("Nenhuma linha válida encontrada");
+      // insert em lotes de 200
+      for (let i = 0; i < payload.length; i += 200) {
+        const { error } = await supabase.from("card_transactions").insert(payload.slice(i, i + 200));
+        if (error) throw error;
+      }
+      return { imported: payload.length, skipped };
+    },
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(`${r.imported} importado(s)${r.skipped ? `, ${r.skipped} ignorado(s)` : ""}`); onClose(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog title="Importar compras de CSV" onClose={onClose}>
+      {step === "upload" ? (
+        <div className="space-y-3">
+          <Field label="Cartão de destino">
+            <select value={cardId} onChange={(e) => setCardId(e.target.value)} className="input">
+              {allCards.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Responsável padrão">
+            <input value={defaultPayer} onChange={(e) => setDefaultPayer(e.target.value)} className="input" />
+          </Field>
+          <Field label="Arquivo CSV">
+            <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} className="input" />
+          </Field>
+          <p className="text-xs text-muted-foreground">Suporta colunas separadas por vírgula ou ponto-e-vírgula, datas em dd/mm/aaaa ou aaaa-mm-dd, valores no formato brasileiro (R$ 1.234,56) ou ponto.</p>
+        </div>
+      ) : (
+        <div className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Coluna Data">
+              <select value={dateCol} onChange={(e) => setDateCol(Number(e.target.value))} className="input">
+                <option value={-1}>—</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </Field>
+            <Field label="Coluna Valor">
+              <select value={amtCol} onChange={(e) => setAmtCol(Number(e.target.value))} className="input">
+                <option value={-1}>—</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </Field>
+            <Field label="Coluna Descrição">
+              <select value={descCol} onChange={(e) => setDescCol(Number(e.target.value))} className="input">
+                <option value={-1}>—</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </Field>
+            <Field label="Coluna Responsável (opcional)">
+              <select value={payerCol} onChange={(e) => setPayerCol(Number(e.target.value))} className="input">
+                <option value={-1}>—</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={invertSign} onChange={(e) => setInvertSign(e.target.checked)} />
+            Inverter sinal (use se seu CSV traz despesas como negativas)
+          </label>
+          <div className="rounded-lg border border-border bg-secondary/30 p-2">
+            <div className="mb-1 text-xs font-medium text-muted-foreground">Pré-visualização ({Math.min(10, rows.length)} de {rows.length})</div>
+            <div className="max-h-48 overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="text-muted-foreground"><tr><th className="text-left p-1">Data</th><th className="text-left p-1">Descrição</th><th className="text-right p-1">Valor</th><th className="text-left p-1">Fatura</th></tr></thead>
+                <tbody>
+                  {preview.map((p, i) => (
+                    <tr key={i} className={!p.date || p.amount == null ? "text-destructive" : ""}>
+                      <td className="p-1">{p.date || "?"}</td>
+                      <td className="p-1 truncate max-w-[140px]">{p.desc}</td>
+                      <td className="p-1 text-right tabular-nums">{p.amount != null ? brl(p.amount) : "?"}</td>
+                      <td className="p-1">{p.invoice ? monthLabel(p.invoice) : "?"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setStep("upload")} className="btn-secondary flex-1 justify-center">Voltar</button>
+            <button type="button" onClick={() => importAll.mutate()} disabled={importAll.isPending || dateCol < 0 || amtCol < 0} className="btn-primary flex-1 justify-center">{importAll.isPending ? "Importando..." : `Importar ${rows.length} linha(s)`}</button>
+          </div>
+        </div>
+      )}
+    </Dialog>
   );
 }
 

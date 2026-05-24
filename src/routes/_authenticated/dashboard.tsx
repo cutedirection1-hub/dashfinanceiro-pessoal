@@ -85,7 +85,7 @@ function DashboardPage() {
   const owedByOthers = payerEntries.filter(([k]) => k.toLowerCase() !== "eu").reduce((s, [, v]) => s + v, 0);
 
   // Evolução: últimos 6 meses a partir do mês selecionado
-  const chart: { mes: string; gasto: number; patrimonio: number }[] = [];
+  const chart: { mes: string; gasto: number; patrimonio: number; investimentos: number }[] = [];
   const investTotalNow = investTotal; // snapshot atual de investimentos
   for (let i = 5; i >= 0; i--) {
     const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
@@ -102,12 +102,30 @@ function DashboardPage() {
         .reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
       return acc + Number(a.initial_balance) + txSum;
     }, 0);
-    const patAtEnd = accBalAtEnd + investTotalNow - cards;
+
+    // Reconstrução do valor investido no fim do mês a partir dos aportes/resgates
+    const investAtEnd = data.inv.reduce((tot, asset) => {
+      const cs = data.contrib.filter((c: any) => c.investment_id === asset.id && c.occurred_on <= e);
+      let qty = 0;
+      let amountNet = 0; // soma líquida (aporte - resgate)
+      for (const c of cs) {
+        const sign = c.kind === "resgate" ? -1 : 1;
+        amountNet += sign * Number(c.amount || 0);
+        if (c.quantity != null) qty += sign * Number(c.quantity);
+      }
+      const price = Number(asset.current_price || asset.average_price || 0);
+      // Se há quantidade rastreada (ações/variável), usar qty * preço atual; senão, usar valor líquido aportado
+      const val = qty > 0 ? qty * price : Math.max(0, amountNet);
+      return tot + val;
+    }, 0);
+
+    const patAtEnd = accBalAtEnd + investAtEnd - cards;
 
     chart.push({
       mes: d.toLocaleDateString("pt-BR", { month: "short" }),
       gasto: accs + cards,
       patrimonio: patAtEnd,
+      investimentos: investAtEnd,
     });
   }
 

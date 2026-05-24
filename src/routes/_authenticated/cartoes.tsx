@@ -111,6 +111,41 @@ function CartoesPage() {
     }
   };
 
+  const deletePerm = useMutation({
+    mutationFn: async (card: Card) => {
+      const { error: e1 } = await supabase.from("card_transactions").delete().eq("card_id", card.id);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("credit_cards").delete().eq("id", card.id);
+      if (e2) throw e2;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Cartão excluído"); setDeletePermCard(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const recalcInvoices = useMutation({
+    mutationFn: async () => {
+      // Para cada cartão, recalcula invoice_month das transações sem recorrência (assinaturas seguem cronograma próprio)
+      const { data: allTx, error } = await supabase.from("card_transactions").select("*");
+      if (error) throw error;
+      let updated = 0;
+      for (const t of (allTx ?? []) as CTx[]) {
+        if (t.recurrence && t.recurrence !== "none") continue;
+        const card = cards.find((c) => c.id === t.card_id);
+        if (!card) continue;
+        const firstInvoice = invoiceMonth(t.purchased_on, card.closing_day, card.due_day);
+        const expected = addMonths(firstInvoice, (t.installment_no || 1) - 1);
+        if (expected !== t.invoice_month) {
+          const { error: uErr } = await supabase.from("card_transactions").update({ invoice_month: expected }).eq("id", t.id);
+          if (uErr) throw uErr;
+          updated++;
+        }
+      }
+      return updated;
+    },
+    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(`${n} lançamento(s) recalculado(s)`); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   return (
     <div>
       <Header title="Cartões de crédito">

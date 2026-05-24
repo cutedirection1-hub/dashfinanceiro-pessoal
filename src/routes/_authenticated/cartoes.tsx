@@ -274,7 +274,7 @@ function CartoesPage() {
 
       {showCard && <CardDialog onClose={() => { setShowCard(false); setEditCard(null); }} userId={user!.id} editing={editCard} />}
       {showTx && <CardTxDialog cards={cards} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
-      {showImport && <ImportCsvDialog cards={cards.length ? cards : []} allCards={cards} onClose={() => setShowImport(false)} userId={user!.id} />}
+      {showImport && <ImportCsvDialog allCards={cards} onClose={() => setShowImport(false)} userId={user!.id} />}
       {deletePermCard && (
         <DeletePermDialog
           card={deletePermCard}

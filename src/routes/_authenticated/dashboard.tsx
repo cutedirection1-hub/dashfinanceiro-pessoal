@@ -24,12 +24,13 @@ function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const [accounts, accTx, cards, cardTx, inv] = await Promise.all([
+      const [accounts, accTx, cards, cardTx, inv, contrib] = await Promise.all([
         supabase.from("accounts").select("*").eq("archived", false),
         supabase.from("account_transactions").select("*"),
         supabase.from("credit_cards").select("*").eq("archived", false),
         supabase.from("card_transactions").select("*"),
         supabase.from("investments").select("*"),
+        supabase.from("investment_contributions").select("*"),
       ]);
       return {
         accounts: accounts.data ?? [],
@@ -37,6 +38,7 @@ function DashboardPage() {
         cards: cards.data ?? [],
         cardTx: cardTx.data ?? [],
         inv: inv.data ?? [],
+        contrib: contrib.data ?? [],
       };
     },
   });
@@ -83,8 +85,8 @@ function DashboardPage() {
   const owedByOthers = payerEntries.filter(([k]) => k.toLowerCase() !== "eu").reduce((s, [, v]) => s + v, 0);
 
   // Evolução: últimos 6 meses a partir do mês selecionado
-  const chart: { mes: string; gasto: number; patrimonio: number }[] = [];
-  const investTotalNow = investTotal; // snapshot atual de investimentos
+  const chart: { mes: string; gasto: number; patrimonio: number; investimentos: number }[] = [];
+  void investTotal;
   for (let i = 5; i >= 0; i--) {
     const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
     const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
@@ -100,12 +102,30 @@ function DashboardPage() {
         .reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
       return acc + Number(a.initial_balance) + txSum;
     }, 0);
-    const patAtEnd = accBalAtEnd + investTotalNow - cards;
+
+    // Reconstrução do valor investido no fim do mês a partir dos aportes/resgates
+    const investAtEnd = data.inv.reduce((tot, asset) => {
+      const cs = data.contrib.filter((c: any) => c.investment_id === asset.id && c.occurred_on <= e);
+      let qty = 0;
+      let amountNet = 0; // soma líquida (aporte - resgate)
+      for (const c of cs) {
+        const sign = c.kind === "resgate" ? -1 : 1;
+        amountNet += sign * Number(c.amount || 0);
+        if (c.quantity != null) qty += sign * Number(c.quantity);
+      }
+      const price = Number(asset.current_price || asset.average_price || 0);
+      // Se há quantidade rastreada (ações/variável), usar qty * preço atual; senão, usar valor líquido aportado
+      const val = qty > 0 ? qty * price : Math.max(0, amountNet);
+      return tot + val;
+    }, 0);
+
+    const patAtEnd = accBalAtEnd + investAtEnd - cards;
 
     chart.push({
       mes: d.toLocaleDateString("pt-BR", { month: "short" }),
       gasto: accs + cards,
       patrimonio: patAtEnd,
+      investimentos: investAtEnd,
     });
   }
 
@@ -190,6 +210,25 @@ function DashboardPage() {
                 formatter={(v: number) => brl(v)}
               />
               <Line type="monotone" dataKey="patrimonio" stroke="oklch(0.72 0.18 265)" strokeWidth={2.5} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold">Evolução dos investimentos</h2>
+        <p className="text-xs text-muted-foreground">6 meses até {monthLabel(ref.ym)} (posição reconstruída por aportes e resgates)</p>
+        <div className="mt-4 h-64">
+          <ResponsiveContainer>
+            <LineChart data={chart}>
+              <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
+              <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
+              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} />
+              <Tooltip
+                contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
+                formatter={(v: number) => brl(v)}
+              />
+              <Line type="monotone" dataKey="investimentos" stroke="oklch(0.75 0.16 50)" strokeWidth={2.5} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

@@ -150,6 +150,8 @@ function CartoesPage() {
     <div>
       <Header title="Cartões de crédito">
         <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
+        <button onClick={() => recalcInvoices.mutate()} disabled={recalcInvoices.isPending || !cards.length} className="btn-secondary" title="Recalcular fatura de todas as compras com a regra atual"><RefreshCw className="h-4 w-4" /> Recalcular faturas</button>
+        <button onClick={() => setShowImport(true)} disabled={!cards.length} className="btn-secondary"><Upload className="h-4 w-4" /> Importar CSV</button>
         <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
         <button onClick={() => { setEditCard(null); setShowCard(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo cartão</button>
       </Header>

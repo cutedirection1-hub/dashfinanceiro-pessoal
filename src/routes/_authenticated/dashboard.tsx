@@ -24,12 +24,13 @@ function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const [accounts, accTx, cards, cardTx, inv] = await Promise.all([
+      const [accounts, accTx, cards, cardTx, inv, contrib] = await Promise.all([
         supabase.from("accounts").select("*").eq("archived", false),
         supabase.from("account_transactions").select("*"),
         supabase.from("credit_cards").select("*").eq("archived", false),
         supabase.from("card_transactions").select("*"),
         supabase.from("investments").select("*"),
+        supabase.from("investment_contributions").select("*"),
       ]);
       return {
         accounts: accounts.data ?? [],
@@ -37,6 +38,7 @@ function DashboardPage() {
         cards: cards.data ?? [],
         cardTx: cardTx.data ?? [],
         inv: inv.data ?? [],
+        contrib: contrib.data ?? [],
       };
     },
   });

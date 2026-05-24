@@ -29,6 +29,8 @@ function CartoesPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [payerFilter, setPayerFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [deletePermCard, setDeletePermCard] = useState<Card | null>(null);
 
   const { data } = useQuery({
     queryKey: ["cartoes", showArchived],

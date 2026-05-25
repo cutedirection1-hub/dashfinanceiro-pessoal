@@ -142,9 +142,19 @@ function CartoesPage() {
       }
       return updated;
     },
-    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(`${n} lançamento(s) recalculado(s)`); },
+    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); if (n > 0) toast.success(`${n} lançamento(s) recalculado(s)`); },
     onError: (e: any) => toast.error(e.message),
   });
+
+  // Recalcula uma única vez por usuário após a mudança da regra de fatura (v3).
+  useEffect(() => {
+    if (!cards.length || !tx.length) return;
+    const flag = `invoice-rule-v3-applied:${user?.id}`;
+    if (localStorage.getItem(flag)) return;
+    localStorage.setItem(flag, "1");
+    recalcInvoices.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards.length, tx.length, user?.id]);
 
   return (
     <div>

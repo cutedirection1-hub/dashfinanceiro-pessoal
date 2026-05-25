@@ -6,17 +6,32 @@ import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });
 
 type Card = { id: string; name: string; brand: string | null; credit_limit: number; closing_day: number; due_day: number };
+type Category = { id: string; name: string; color: string; kind: string; icon: string | null };
 type CTx = {
   id: string; card_id: string; group_id: string; amount: number; description: string | null;
   purchased_on: string; installment_no: number; installment_total: number; invoice_month: string;
   payer_name: string | null; recurrence?: string | null; recurrence_group_id?: string | null;
+  category_id?: string | null;
 };
+
+const DEFAULT_CATEGORIES: { name: string; color: string }[] = [
+  { name: "Alimentação", color: "#ef4444" }, { name: "Assinaturas", color: "#8b5cf6" },
+  { name: "Casa", color: "#f59e0b" }, { name: "Educação", color: "#3b82f6" },
+  { name: "Lazer", color: "#ec4899" }, { name: "Objetivos", color: "#10b981" },
+  { name: "Pet", color: "#a855f7" }, { name: "Saúde", color: "#06b6d4" },
+  { name: "Selfcare", color: "#f472b6" }, { name: "Transporte", color: "#0ea5e9" },
+  { name: "Vestuário", color: "#d946ef" }, { name: "Viagem", color: "#14b8a6" },
+  { name: "Taxas", color: "#64748b" }, { name: "Outros - Pessoais", color: "#94a3b8" },
+  { name: "Outros", color: "#6b7280" },
+];
+const COLOR_PRESETS = ["#ef4444","#f59e0b","#eab308","#10b981","#14b8a6","#06b6d4","#0ea5e9","#3b82f6","#6366f1","#8b5cf6","#a855f7","#d946ef","#ec4899","#f472b6","#64748b","#6b7280"];
 
 function CartoesPage() {
   const { user } = useAuth();
@@ -42,6 +57,33 @@ function CartoesPage() {
       return { cards: (c.data ?? []) as Card[], tx: (t.data ?? []) as CTx[] };
     },
   });
+
+  const [showCats, setShowCats] = useState(false);
+
+  const { data: cats } = useQuery({
+    queryKey: ["categories", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase.from("categories").select("*").eq("kind", "expense").order("name");
+      return (data ?? []) as Category[];
+    },
+  });
+  const categories = cats ?? [];
+  const catMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
+
+  // Seed default categories once per user when none exist
+  useEffect(() => {
+    if (!user?.id || cats === undefined) return;
+    if (categories.length > 0) return;
+    const flag = `categories-seeded:${user.id}`;
+    if (localStorage.getItem(flag)) return;
+    localStorage.setItem(flag, "1");
+    (async () => {
+      const payload = DEFAULT_CATEGORIES.map((c) => ({ user_id: user.id, name: c.name, color: c.color, kind: "expense" }));
+      const { error } = await supabase.from("categories").insert(payload);
+      if (!error) qc.invalidateQueries({ queryKey: ["categories", user.id] });
+    })();
+  }, [user?.id, cats, categories.length, qc]);
 
   const cards = data?.cards ?? [];
   const tx = data?.tx ?? [];
@@ -160,6 +202,7 @@ function CartoesPage() {
     <div>
       <Header title="Cartões de crédito">
         <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
+        <button onClick={() => setShowCats(true)} className="btn-secondary"><Tag className="h-4 w-4" /> Categorias</button>
         <button onClick={() => recalcInvoices.mutate()} disabled={recalcInvoices.isPending || !cards.length} className="btn-secondary" title="Recalcular fatura de todas as compras com a regra atual"><RefreshCw className="h-4 w-4" /> Recalcular faturas</button>
         <button onClick={() => setShowImport(true)} disabled={!cards.length} className="btn-secondary"><Upload className="h-4 w-4" /> Importar CSV</button>
         <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
@@ -257,11 +300,55 @@ function CartoesPage() {
             </div>
           )}
 
+          {cardTx.length > 0 && (() => {
+            const byCat = cardTx.reduce<Record<string, number>>((acc, t) => {
+              const k = t.category_id || "__none__";
+              acc[k] = (acc[k] || 0) + Number(t.amount);
+              return acc;
+            }, {});
+            const pieData = Object.entries(byCat)
+              .map(([id, val]) => {
+                const c = id === "__none__" ? null : catMap[id];
+                return { name: c?.name || "Sem categoria", value: val, color: c?.color || "#475569" };
+              })
+              .sort((a, b) => b.value - a.value);
+            return (
+              <div className="border-b border-border px-5 py-4">
+                <h3 className="mb-3 text-sm font-medium text-muted-foreground">Gastos por categoria</h3>
+                <div className="grid items-center gap-4 md:grid-cols-2">
+                  <div className="h-56">
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={88} paddingAngle={2}>
+                          {pieData.map((d, i) => <Cell key={i} fill={d.color} stroke="transparent" />)}
+                        </Pie>
+                        <RTooltip contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }} formatter={(v: number) => brl(v)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="space-y-1.5 text-sm">
+                    {pieData.map((d) => {
+                      const pct = (d.value / Math.max(invoiceTotal, 1)) * 100;
+                      return (
+                        <li key={d.name} className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 truncate"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}</span>
+                          <span className="tabular-nums text-muted-foreground">{brl(d.value)} · {pct.toFixed(0)}%</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            );
+          })()}
+
           {cardTx.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</div>
           ) : (
             <ul className="divide-y divide-border">
-              {cardTx.map((t) => (
+              {cardTx.map((t) => {
+                const cat = t.category_id ? catMap[t.category_id] : null;
+                return (
                 <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
                   <div>
                     <div className="font-medium flex items-center gap-2">
@@ -272,6 +359,10 @@ function CartoesPage() {
                           <Repeat className="h-3 w-3" /> {t.recurrence === "monthly" ? "Mensal" : "Anual"}
                         </span>
                       )}
+                      <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground" style={cat ? { borderColor: cat.color + "66", color: cat.color } : undefined}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: cat?.color || "#64748b" }} />
+                        {cat?.name || "Sem categoria"}
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}</div>
                   </div>
@@ -281,15 +372,16 @@ function CartoesPage() {
                     <button onClick={() => handleDelete(t)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </li>
-              ))}
+              );})}
             </ul>
           )}
         </div>
       )}
 
       {showCard && <CardDialog onClose={() => { setShowCard(false); setEditCard(null); }} userId={user!.id} editing={editCard} />}
-      {showTx && <CardTxDialog cards={cards} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
-      {showImport && <ImportCsvDialog allCards={cards} onClose={() => setShowImport(false)} userId={user!.id} />}
+      {showTx && <CardTxDialog cards={cards} categories={categories} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
+      {showImport && <ImportCsvDialog allCards={cards} categories={categories} onClose={() => setShowImport(false)} userId={user!.id} />}
+      {showCats && <CategoriesDialog categories={categories} userId={user!.id} onClose={() => setShowCats(false)} />}
       {deletePermCard && (
         <DeletePermDialog
           card={deletePermCard}
@@ -327,18 +419,22 @@ function DeletePermDialog({ card, txCount, txTotal, onClose, onConfirm, pending 
   );
 }
 
-function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onClose: () => void; userId: string }) {
+function ImportCsvDialog({ allCards, categories, onClose, userId }: { allCards: Card[]; categories: Category[]; onClose: () => void; userId: string }) {
   const qc = useQueryClient();
   const [step, setStep] = useState<"upload" | "map">("upload");
   const [cardId, setCardId] = useState(allCards[0]?.id ?? "");
   const [defaultPayer, setDefaultPayer] = useState("Eu");
+  const [defaultCatId, setDefaultCatId] = useState<string>("");
   const [rows, setRows] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [dateCol, setDateCol] = useState<number>(-1);
   const [descCol, setDescCol] = useState<number>(-1);
   const [amtCol, setAmtCol] = useState<number>(-1);
   const [payerCol, setPayerCol] = useState<number>(-1);
+  const [catCol, setCatCol] = useState<number>(-1);
   const [invertSign, setInvertSign] = useState(false);
+  const catByName = useMemo(() => Object.fromEntries(categories.map((c) => [c.name.toLowerCase(), c.id])), [categories]);
+  const resolveCat = (name: string | undefined) => (name ? catByName[name.trim().toLowerCase()] : null) || defaultCatId || null;
 
   const onFile = async (f: File) => {
     const text = await f.text();
@@ -353,6 +449,7 @@ function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onCl
     setDescCol(find(["desc", "histor", "estabel", "merchant", "lançamento", "lancamento"]));
     setAmtCol(find(["valor", "amount", "montante", "r$"]));
     setPayerCol(find(["resp", "titular", "portador"]));
+    setCatCol(find(["categ"]));
     setStep("map");
   };
 
@@ -390,6 +487,7 @@ function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onCl
           invoice_month: invoiceMonth(date, card.closing_day, card.due_day),
           payer_name: (payerCol >= 0 ? r[payerCol] : defaultPayer)?.trim() || null,
           recurrence: "none",
+          category_id: resolveCat(catCol >= 0 ? r[catCol] : undefined),
         });
       }
       if (!payload.length) throw new Error("Nenhuma linha válida encontrada");
@@ -416,10 +514,16 @@ function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onCl
           <Field label="Responsável padrão">
             <input value={defaultPayer} onChange={(e) => setDefaultPayer(e.target.value)} className="input" />
           </Field>
+          <Field label="Categoria padrão (quando o CSV não tiver)">
+            <select value={defaultCatId} onChange={(e) => setDefaultCatId(e.target.value)} className="input">
+              <option value="">Sem categoria</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
           <Field label="Arquivo CSV">
             <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} className="input" />
           </Field>
-          <p className="text-xs text-muted-foreground">Suporta colunas separadas por vírgula ou ponto-e-vírgula, datas em dd/mm/aaaa ou aaaa-mm-dd, valores no formato brasileiro (R$ 1.234,56) ou ponto.</p>
+          <p className="text-xs text-muted-foreground">Suporta colunas separadas por vírgula ou ponto-e-vírgula, datas em dd/mm/aaaa ou aaaa-mm-dd, valores no formato brasileiro (R$ 1.234,56) ou ponto. A coluna "Categoria" do CSV é mapeada por nome.</p>
         </div>
       ) : (
         <div className="space-y-3 text-sm">
@@ -444,6 +548,12 @@ function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onCl
             </Field>
             <Field label="Coluna Responsável (opcional)">
               <select value={payerCol} onChange={(e) => setPayerCol(Number(e.target.value))} className="input">
+                <option value={-1}>—</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </Field>
+            <Field label="Coluna Categoria (opcional)">
+              <select value={catCol} onChange={(e) => setCatCol(Number(e.target.value))} className="input">
                 <option value={-1}>—</option>
                 {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
               </select>
@@ -519,7 +629,7 @@ function CardDialog({ onClose, userId, editing }: { onClose: () => void; userId:
   );
 }
 
-function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onClose: () => void; userId: string; editing: CTx | null }) {
+function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: Card[]; categories: Category[]; onClose: () => void; userId: string; editing: CTx | null }) {
   const qc = useQueryClient();
   const [cardId, setCardId] = useState(editing?.card_id ?? cards[0]?.id ?? "");
   const [amount, setAmount] = useState(editing ? String(Number(editing.amount) * Number(editing.installment_total)) : "");
@@ -527,6 +637,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
   const [date, setDate] = useState(editing?.purchased_on ?? new Date().toISOString().slice(0, 10));
   const [installments, setInstallments] = useState(String(editing?.installment_total ?? "1"));
   const [payer, setPayer] = useState(editing?.payer_name ?? "Eu");
+  const [categoryId, setCategoryId] = useState<string>(editing?.category_id ?? "");
 
   const isSub = editing?.recurrence && editing.recurrence !== "none";
   const [isSubscription, setIsSubscription] = useState<boolean>(!!isSub);
@@ -544,6 +655,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
         const payload: any = {
           card_id: cardId, amount: totalAmount, description: desc || null,
           payer_name: payer.trim() || null, purchased_on: date,
+          category_id: categoryId || null,
         };
         if (applyToFuture && editing.recurrence_group_id) {
           const { error } = await supabase.from("card_transactions").update(payload)
@@ -575,7 +687,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
           purchased_on: date, installment_no: 1, installment_total: 1,
           invoice_month: addMonths(firstInvoice, i * step),
           payer_name: payer.trim() || null,
-          recurrence, recurrence_group_id,
+          recurrence, recurrence_group_id, category_id: categoryId || null,
         }));
         const { error } = await supabase.from("card_transactions").insert(rows);
         if (error) throw error;
@@ -594,7 +706,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
         installment_no: i + 1, installment_total: total,
         invoice_month: addMonths(firstInvoice, i),
         payer_name: payer.trim() || null,
-        recurrence: "none",
+        recurrence: "none", category_id: categoryId || null,
       }));
       const { error } = await supabase.from("card_transactions").insert(rows);
       if (error) throw error;
@@ -618,6 +730,12 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
           <input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
         </Field>
         <Field label="Descrição"><input value={desc} onChange={(e) => setDesc(e.target.value)} className="input" placeholder="Ex: Netflix" /></Field>
+        <Field label="Categoria">
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input">
+            <option value="">Sem categoria</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Data da compra"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
           {!isSubscription && (
@@ -682,6 +800,109 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
 
         <button disabled={save.isPending} className="btn-primary w-full justify-center">{save.isPending ? "Salvando..." : "Salvar"}</button>
       </form>
+    </Dialog>
+  );
+}
+
+function CategoriesDialog({ categories, userId, onClose }: { categories: Category[]; userId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [color, setColor] = useState(COLOR_PRESETS[0]);
+  const [confirmDel, setConfirmDel] = useState<Category | null>(null);
+
+  const { data: counts } = useQuery({
+    queryKey: ["categories-counts", userId],
+    queryFn: async () => {
+      const { data } = await supabase.from("card_transactions").select("category_id");
+      const map: Record<string, number> = {};
+      for (const r of (data ?? []) as { category_id: string | null }[]) {
+        if (r.category_id) map[r.category_id] = (map[r.category_id] || 0) + 1;
+      }
+      return map;
+    },
+  });
+
+  const create = useMutation({
+    mutationFn: async () => {
+      if (!name.trim()) throw new Error("Informe o nome");
+      const { error } = await supabase.from("categories").insert({ user_id: userId, name: name.trim(), color, kind: "expense" });
+      if (error) throw error;
+    },
+    onSuccess: () => { setName(""); qc.invalidateQueries({ queryKey: ["categories", userId] }); toast.success("Categoria criada"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (cat: Category) => {
+      const used = counts?.[cat.id] || 0;
+      if (used > 0) {
+        const { error: e0 } = await supabase.from("card_transactions").update({ category_id: null }).eq("category_id", cat.id);
+        if (e0) throw e0;
+      }
+      const { error } = await supabase.from("categories").delete().eq("id", cat.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setConfirmDel(null);
+      qc.invalidateQueries({ queryKey: ["categories", userId] });
+      qc.invalidateQueries({ queryKey: ["categories-counts", userId] });
+      qc.invalidateQueries({ queryKey: ["cartoes"] });
+      toast.success("Categoria excluída");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog title="Categorias" onClose={onClose}>
+      <div className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+          <div className="text-xs font-medium text-muted-foreground">Nova categoria</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" className="input" />
+          <div className="flex flex-wrap gap-1.5">
+            {COLOR_PRESETS.map((c) => (
+              <button type="button" key={c} onClick={() => setColor(c)}
+                className={`h-6 w-6 rounded-full border-2 transition ${color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                style={{ background: c }} aria-label={c} />
+            ))}
+          </div>
+          <button disabled={create.isPending} className="btn-primary w-full justify-center"><Plus className="h-4 w-4" /> Adicionar</button>
+        </form>
+
+        <div className="max-h-80 overflow-auto rounded-lg border border-border">
+          {categories.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">Nenhuma categoria.</div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {categories.map((c) => {
+                const used = counts?.[c.id] || 0;
+                return (
+                  <li key={c.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ background: c.color }} />
+                      <span>{c.name}</span>
+                      <span className="text-xs text-muted-foreground">· {used} uso{used === 1 ? "" : "s"}</span>
+                    </div>
+                    <button onClick={() => setConfirmDel(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {confirmDel && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            <p>Excluir <span className="font-semibold">{confirmDel.name}</span>?</p>
+            {(counts?.[confirmDel.id] || 0) > 0 && (
+              <p className="mt-1 text-xs">⚠️ {counts?.[confirmDel.id]} lançamento(s) usarão esta categoria — ficarão como "Sem categoria".</p>
+            )}
+            <div className="mt-2 flex gap-2">
+              <button onClick={() => setConfirmDel(null)} className="btn-secondary flex-1 justify-center">Cancelar</button>
+              <button onClick={() => remove.mutate(confirmDel)} disabled={remove.isPending} className="btn-primary flex-1 justify-center bg-destructive hover:bg-destructive/90">{remove.isPending ? "..." : "Excluir"}</button>
+            </div>
+          </div>
+        )}
+      </div>
     </Dialog>
   );
 }

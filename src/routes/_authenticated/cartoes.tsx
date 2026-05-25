@@ -58,6 +58,33 @@ function CartoesPage() {
     },
   });
 
+  const [showCats, setShowCats] = useState(false);
+
+  const { data: cats } = useQuery({
+    queryKey: ["categories", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase.from("categories").select("*").eq("kind", "expense").order("name");
+      return (data ?? []) as Category[];
+    },
+  });
+  const categories = cats ?? [];
+  const catMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
+
+  // Seed default categories once per user when none exist
+  useEffect(() => {
+    if (!user?.id || cats === undefined) return;
+    if (categories.length > 0) return;
+    const flag = `categories-seeded:${user.id}`;
+    if (localStorage.getItem(flag)) return;
+    localStorage.setItem(flag, "1");
+    (async () => {
+      const payload = DEFAULT_CATEGORIES.map((c) => ({ user_id: user.id, name: c.name, color: c.color, kind: "expense" }));
+      const { error } = await supabase.from("categories").insert(payload);
+      if (!error) qc.invalidateQueries({ queryKey: ["categories", user.id] });
+    })();
+  }, [user?.id, cats, categories.length, qc]);
+
   const cards = data?.cards ?? [];
   const tx = data?.tx ?? [];
 

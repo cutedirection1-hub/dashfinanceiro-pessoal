@@ -730,6 +730,12 @@ function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: 
           <input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
         </Field>
         <Field label="Descrição"><input value={desc} onChange={(e) => setDesc(e.target.value)} className="input" placeholder="Ex: Netflix" /></Field>
+        <Field label="Categoria">
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input">
+            <option value="">Sem categoria</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Data da compra"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
           {!isSubscription && (

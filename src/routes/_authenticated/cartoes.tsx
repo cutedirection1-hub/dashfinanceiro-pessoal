@@ -514,10 +514,16 @@ function ImportCsvDialog({ allCards, categories, onClose, userId }: { allCards: 
           <Field label="Responsável padrão">
             <input value={defaultPayer} onChange={(e) => setDefaultPayer(e.target.value)} className="input" />
           </Field>
+          <Field label="Categoria padrão (quando o CSV não tiver)">
+            <select value={defaultCatId} onChange={(e) => setDefaultCatId(e.target.value)} className="input">
+              <option value="">Sem categoria</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
           <Field label="Arquivo CSV">
             <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} className="input" />
           </Field>
-          <p className="text-xs text-muted-foreground">Suporta colunas separadas por vírgula ou ponto-e-vírgula, datas em dd/mm/aaaa ou aaaa-mm-dd, valores no formato brasileiro (R$ 1.234,56) ou ponto.</p>
+          <p className="text-xs text-muted-foreground">Suporta colunas separadas por vírgula ou ponto-e-vírgula, datas em dd/mm/aaaa ou aaaa-mm-dd, valores no formato brasileiro (R$ 1.234,56) ou ponto. A coluna "Categoria" do CSV é mapeada por nome.</p>
         </div>
       ) : (
         <div className="space-y-3 text-sm">

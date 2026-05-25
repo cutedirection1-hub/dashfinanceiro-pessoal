@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate, invoiceMonth, addMonths, monthLabel } from "@/lib/format";
+import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });

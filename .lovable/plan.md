@@ -1,40 +1,43 @@
-# Plano
+## Reset da lógica de fatura do cartão
 
-## 1. Dashboard — Evolução do patrimônio de investimentos
-Adicionar um terceiro gráfico em `src/routes/_authenticated/dashboard.tsx` mostrando a evolução do **valor investido** nos últimos 6 meses até o mês selecionado.
+### Nova regra (substitui a anterior)
+- Compra **≤ dia de fechamento** → fatura do **mês vigente** (vencimento neste mês).
+- Compra **> dia de fechamento** → fatura do **mês seguinte**.
+- Se `vencimento < fechamento` no mesmo cartão (ex.: fech. 25, venc. 05), o vencimento da fatura "do mês X" é em X+1.
 
-- Linha: soma de `quantity * current_price` (ou `average_price` quando não houver preço atual) de todos os ativos, considerando o histórico de aportes/resgates em `investment_contributions` para reconstruir a posição em cada fim de mês.
-- Para meses passados: usar a quantidade acumulada até aquele mês × preço médio histórico (aproximação, já que não armazenamos preço por data).
-- Reaproveitar o estilo do gráfico já existente (Recharts, mesmas cores do tema).
+Exemplo (fech. 10 / venc. 17): 08/05 → vence 17/05 · 11/05 → vence 17/06.
+Exemplo (fech. 20 / venc. 27): 22/05/2026 → vence 27/06/2026.
 
-## 2. Cartões — Validar lógica de fatura
-Você confirmou a regra **B**: fechamento 20, vencimento 25 → compra 10/mai cai em **fatura de junho**, compra 22/mai cai em **fatura de julho**.
+### 1. `src/lib/format.ts` — reescrever `invoiceMonth`
+```ts
+// dia ≤ closingDay → mês atual; senão mês+1.
+// invoice_month armazena o 1º dia do mês de VENCIMENTO da fatura.
+export function invoiceMonth(purchasedOnIso, closingDay, dueDay) {
+  const [y, m, d] = ...;
+  let monthIdx = m - 1;
+  if (d > closingDay) monthIdx += 1;
+  // se vencimento cai antes do fechamento dentro do ciclo, soma +1
+  if (dueDay < closingDay) monthIdx += 1;
+  // normaliza ano
+}
+```
+Adicionar helper `invoiceDueDate(invoiceMonthIso, dueDay)` para mostrar a data exata do vencimento (tratando fev/30/31 com clamp ao último dia do mês).
 
-Essa é exatamente a regra hoje implementada em `src/lib/format.ts` (`invoiceMonth`: sempre M+1; se dia > fechamento, M+2). Como você diz que ainda está errado na tela, vou:
+### 2. `src/routes/_authenticated/cartoes.tsx`
+- **Recalcular faturas existentes**: o botão "Recalcular faturas" passa a usar a nova regra, percorrendo todas as `card_transactions` agrupadas por cartão e atualizando `invoice_month`. Rodar automaticamente na primeira renderização após o deploy (flag em localStorage `invoice-rule-v2-applied`) para corrigir o histórico sem o usuário precisar clicar.
+- **Edição de compra**: ao alterar `purchased_on`, recalcular `invoice_month`.
+- **Parcelamento**: garantir que a parcela 1/N usa a regra acima a partir da data da compra; parcelas 2..N somam meses ao `invoice_month` da primeira (já é assim, só validar). Exibir "Parcela X/N · R$ valor · resta R$ X" — já existe parcialmente, completar onde faltar.
+- **Alerta na criação**: se a compra cair na próxima fatura (data > fechamento), exibir badge/aviso no diálogo "Esta compra entrará na fatura de {mês} (vence {dd/mm})".
+- **Limite disponível em tempo real**: card do cartão mostra `limit - soma de parcelas ainda não pagas` (faturas atuais + futuras). Já existe utilização; revisar fórmula.
+- **Importação CSV**: aplicar nova regra ao calcular `invoice_month` na pré-visualização e no insert.
 
-- Adicionar um log/diagnóstico para listar `purchased_on → invoice_month` das transações existentes e confirmar onde diverge.
-- Se as transações antigas foram salvas com a lógica anterior (errada), criar um botão "Recalcular faturas" na aba Cartões que reprocessa o `invoice_month` de todas as transações usando a regra atual.
-- Garantir que ao editar uma compra o `invoice_month` seja recalculado (hoje pode estar preservando o valor antigo).
+### 3. Dashboard
+Sem mudanças — apenas se beneficia do recálculo.
 
-## 3. Cartões — Excluir cartão arquivado
-Na lista de arquivados, adicionar botão "Excluir permanentemente" que:
+### 4. Sem migração de schema
+Todas as colunas necessárias existem (`closing_day`, `due_day`, `invoice_month`, `installment_no`, `installment_total`). Apenas dados são atualizados via update em massa rodado no cliente após login.
 
-- Antes de excluir, conta transações vinculadas e mostra um `AlertDialog` informando: *"Este cartão possui X compras lançadas (R$ Y,YY em histórico de faturas). Excluir removerá permanentemente o cartão e todas as compras vinculadas. Esta ação não pode ser desfeita."*
-- Ao confirmar, deleta `card_transactions` do cartão e depois o `credit_cards`.
-
-## 4. Cartões — Importar CSV
-Adicionar botão "Importar CSV" na aba Cartões abrindo um diálogo:
-
-1. Selecionar **cartão de destino** e **responsável** padrão.
-2. Upload do arquivo `.csv`.
-3. Parse local (sem backend) detectando cabeçalho. Tela de **mapeamento de colunas**: usuário associa colunas do CSV aos campos `Data`, `Descrição`, `Valor` (categoria/responsável opcionais).
-4. Pré-visualização das primeiras 10 linhas já com `invoice_month` calculado pela regra do cartão.
-5. Botão "Importar N lançamentos" → insert em lote em `card_transactions`.
-
-Tratamentos: datas em `dd/mm/aaaa` ou `aaaa-mm-dd`; valores com vírgula decimal e `R$`; valores negativos tratados como estorno (sinal invertido); linhas em branco ignoradas.
-
-## Detalhes técnicos
-- **Arquivos editados:** `src/routes/_authenticated/dashboard.tsx`, `src/routes/_authenticated/cartoes.tsx`, possivelmente `src/lib/format.ts` (helper de parse CSV) ou novo `src/lib/csv.ts`.
-- **Sem migração** de schema — todas as colunas necessárias já existem.
-- Parse CSV via implementação manual leve (split por linha + vírgula/ponto-e-vírgula com suporte a aspas), sem adicionar dependência.
-- Recálculo em massa de `invoice_month`: feito via `supabase.from('card_transactions').update(...)` iterando por cartão (closing_day próprio).
+### Itens fora deste plano (peço confirmação se quer incluir)
+- "Calcular automaticamente o melhor dia de compra" (sugestão proativa) — pode ser um botão "Quando comprar?" no card do cartão que retorna o último dia antes do próximo fechamento para maximizar prazo. Incluir?
+- "Antecipação de parcelas" — marcar parcelas futuras como pagas/antecipadas, descontando do limite. Requer coluna nova `prepaid_on date` em `card_transactions`. Incluir?
+- "Impacto no orçamento mensal" — só faz sentido se houver orçamento configurado (não existe hoje). Pular.

@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate, invoiceMonth, addMonths, monthLabel } from "@/lib/format";
+import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });
@@ -142,9 +142,19 @@ function CartoesPage() {
       }
       return updated;
     },
-    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(`${n} lançamento(s) recalculado(s)`); },
+    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ["cartoes"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); if (n > 0) toast.success(`${n} lançamento(s) recalculado(s)`); },
     onError: (e: any) => toast.error(e.message),
   });
+
+  // Recalcula uma única vez por usuário após a mudança da regra de fatura (v3).
+  useEffect(() => {
+    if (!cards.length || !tx.length) return;
+    const flag = `invoice-rule-v3-applied:${user?.id}`;
+    if (localStorage.getItem(flag)) return;
+    localStorage.setItem(flag, "1");
+    recalcInvoices.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards.length, tx.length, user?.id]);
 
   return (
     <div>
@@ -205,7 +215,12 @@ function CartoesPage() {
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
               <h2 className="font-semibold">Fatura — {monthLabel(ymRef)}</h2>
-              <p className="text-xs text-muted-foreground">Total: {brl(invoiceTotal)}</p>
+              <p className="text-xs text-muted-foreground">
+                Total: {brl(invoiceTotal)}
+                {cards.find((c) => c.id === activeCard) && (
+                  <> · Vence em {fmtDate(invoiceDueDate(ymRef, cards.find((c) => c.id === activeCard)!.due_day))}</>
+                )}
+              </p>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
@@ -609,6 +624,32 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
             <Field label="Parcelas"><input type="number" min={1} max={36} required value={installments} onChange={(e) => setInstallments(e.target.value)} className="input" /></Field>
           )}
         </div>
+
+        {(() => {
+          const c = cards.find((x) => x.id === cardId);
+          const a = Number(amount);
+          if (!c || !date || !a) return null;
+          const total = isSubscription ? 1 : Math.max(1, Number(installments) || 1);
+          const parcel = +(a / total).toFixed(2);
+          const first = invoiceMonth(date, c.closing_day, c.due_day);
+          const due = invoiceDueDate(first, c.due_day);
+          const purchasedDay = Number(date.slice(8, 10));
+          const afterClose = purchasedDay > c.closing_day;
+          return (
+            <div className={`rounded-lg border p-3 text-xs space-y-1 ${afterClose ? "border-amber-500/40 bg-amber-500/10" : "border-primary/30 bg-primary/5"}`}>
+              <div className="flex items-center gap-1.5 font-medium">
+                <Info className="h-3.5 w-3.5" />
+                {isSubscription ? "Primeira cobrança" : (total > 1 ? `Parcela 1/${total}` : "Esta compra")} entra na fatura de <span className="underline">{monthLabel(first)}</span> (vence {fmtDate(due)})
+              </div>
+              {afterClose && <div className="text-amber-700 dark:text-amber-400">⚠ Compra após o fechamento (dia {c.closing_day}) — cai na próxima fatura.</div>}
+              {!isSubscription && total > 1 && (
+                <div className="text-muted-foreground">
+                  {total}× de {brl(parcel)} · última parcela: {monthLabel(addMonths(first, total - 1))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {!editing && (
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">

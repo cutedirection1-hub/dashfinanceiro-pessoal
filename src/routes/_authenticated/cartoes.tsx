@@ -215,7 +215,12 @@ function CartoesPage() {
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
               <h2 className="font-semibold">Fatura — {monthLabel(ymRef)}</h2>
-              <p className="text-xs text-muted-foreground">Total: {brl(invoiceTotal)}</p>
+              <p className="text-xs text-muted-foreground">
+                Total: {brl(invoiceTotal)}
+                {cards.find((c) => c.id === activeCard) && (
+                  <> · Vence em {fmtDate(invoiceDueDate(ymRef, cards.find((c) => c.id === activeCard)!.due_day))}</>
+                )}
+              </p>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>

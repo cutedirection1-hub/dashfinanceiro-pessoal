@@ -803,3 +803,106 @@ function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: 
     </Dialog>
   );
 }
+
+function CategoriesDialog({ categories, userId, onClose }: { categories: Category[]; userId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [color, setColor] = useState(COLOR_PRESETS[0]);
+  const [confirmDel, setConfirmDel] = useState<Category | null>(null);
+
+  const { data: counts } = useQuery({
+    queryKey: ["categories-counts", userId],
+    queryFn: async () => {
+      const { data } = await supabase.from("card_transactions").select("category_id");
+      const map: Record<string, number> = {};
+      for (const r of (data ?? []) as { category_id: string | null }[]) {
+        if (r.category_id) map[r.category_id] = (map[r.category_id] || 0) + 1;
+      }
+      return map;
+    },
+  });
+
+  const create = useMutation({
+    mutationFn: async () => {
+      if (!name.trim()) throw new Error("Informe o nome");
+      const { error } = await supabase.from("categories").insert({ user_id: userId, name: name.trim(), color, kind: "expense" });
+      if (error) throw error;
+    },
+    onSuccess: () => { setName(""); qc.invalidateQueries({ queryKey: ["categories", userId] }); toast.success("Categoria criada"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (cat: Category) => {
+      const used = counts?.[cat.id] || 0;
+      if (used > 0) {
+        const { error: e0 } = await supabase.from("card_transactions").update({ category_id: null }).eq("category_id", cat.id);
+        if (e0) throw e0;
+      }
+      const { error } = await supabase.from("categories").delete().eq("id", cat.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setConfirmDel(null);
+      qc.invalidateQueries({ queryKey: ["categories", userId] });
+      qc.invalidateQueries({ queryKey: ["categories-counts", userId] });
+      qc.invalidateQueries({ queryKey: ["cartoes"] });
+      toast.success("Categoria excluída");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog title="Categorias" onClose={onClose}>
+      <div className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+          <div className="text-xs font-medium text-muted-foreground">Nova categoria</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" className="input" />
+          <div className="flex flex-wrap gap-1.5">
+            {COLOR_PRESETS.map((c) => (
+              <button type="button" key={c} onClick={() => setColor(c)}
+                className={`h-6 w-6 rounded-full border-2 transition ${color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                style={{ background: c }} aria-label={c} />
+            ))}
+          </div>
+          <button disabled={create.isPending} className="btn-primary w-full justify-center"><Plus className="h-4 w-4" /> Adicionar</button>
+        </form>
+
+        <div className="max-h-80 overflow-auto rounded-lg border border-border">
+          {categories.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">Nenhuma categoria.</div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {categories.map((c) => {
+                const used = counts?.[c.id] || 0;
+                return (
+                  <li key={c.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ background: c.color }} />
+                      <span>{c.name}</span>
+                      <span className="text-xs text-muted-foreground">· {used} uso{used === 1 ? "" : "s"}</span>
+                    </div>
+                    <button onClick={() => setConfirmDel(c)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {confirmDel && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            <p>Excluir <span className="font-semibold">{confirmDel.name}</span>?</p>
+            {(counts?.[confirmDel.id] || 0) > 0 && (
+              <p className="mt-1 text-xs">⚠️ {counts?.[confirmDel.id]} lançamento(s) usarão esta categoria — ficarão como "Sem categoria".</p>
+            )}
+            <div className="mt-2 flex gap-2">
+              <button onClick={() => setConfirmDel(null)} className="btn-secondary flex-1 justify-center">Cancelar</button>
+              <button onClick={() => remove.mutate(confirmDel)} disabled={remove.isPending} className="btn-primary flex-1 justify-center bg-destructive hover:bg-destructive/90">{remove.isPending ? "..." : "Excluir"}</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Dialog>
+  );
+}

@@ -706,7 +706,7 @@ function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: 
         installment_no: i + 1, installment_total: total,
         invoice_month: addMonths(firstInvoice, i),
         payer_name: payer.trim() || null,
-        recurrence: "none",
+        recurrence: "none", category_id: categoryId || null,
       }));
       const { error } = await supabase.from("card_transactions").insert(rows);
       if (error) throw error;

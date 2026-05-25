@@ -6,17 +6,32 @@ import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });
 
 type Card = { id: string; name: string; brand: string | null; credit_limit: number; closing_day: number; due_day: number };
+type Category = { id: string; name: string; color: string; kind: string; icon: string | null };
 type CTx = {
   id: string; card_id: string; group_id: string; amount: number; description: string | null;
   purchased_on: string; installment_no: number; installment_total: number; invoice_month: string;
   payer_name: string | null; recurrence?: string | null; recurrence_group_id?: string | null;
+  category_id?: string | null;
 };
+
+const DEFAULT_CATEGORIES: { name: string; color: string }[] = [
+  { name: "Alimentação", color: "#ef4444" }, { name: "Assinaturas", color: "#8b5cf6" },
+  { name: "Casa", color: "#f59e0b" }, { name: "Educação", color: "#3b82f6" },
+  { name: "Lazer", color: "#ec4899" }, { name: "Objetivos", color: "#10b981" },
+  { name: "Pet", color: "#a855f7" }, { name: "Saúde", color: "#06b6d4" },
+  { name: "Selfcare", color: "#f472b6" }, { name: "Transporte", color: "#0ea5e9" },
+  { name: "Vestuário", color: "#d946ef" }, { name: "Viagem", color: "#14b8a6" },
+  { name: "Taxas", color: "#64748b" }, { name: "Outros - Pessoais", color: "#94a3b8" },
+  { name: "Outros", color: "#6b7280" },
+];
+const COLOR_PRESETS = ["#ef4444","#f59e0b","#eab308","#10b981","#14b8a6","#06b6d4","#0ea5e9","#3b82f6","#6366f1","#8b5cf6","#a855f7","#d946ef","#ec4899","#f472b6","#64748b","#6b7280"];
 
 function CartoesPage() {
   const { user } = useAuth();

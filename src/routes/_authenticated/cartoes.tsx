@@ -419,18 +419,22 @@ function DeletePermDialog({ card, txCount, txTotal, onClose, onConfirm, pending 
   );
 }
 
-function ImportCsvDialog({ allCards, onClose, userId }: { allCards: Card[]; onClose: () => void; userId: string }) {
+function ImportCsvDialog({ allCards, categories, onClose, userId }: { allCards: Card[]; categories: Category[]; onClose: () => void; userId: string }) {
   const qc = useQueryClient();
   const [step, setStep] = useState<"upload" | "map">("upload");
   const [cardId, setCardId] = useState(allCards[0]?.id ?? "");
   const [defaultPayer, setDefaultPayer] = useState("Eu");
+  const [defaultCatId, setDefaultCatId] = useState<string>("");
   const [rows, setRows] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [dateCol, setDateCol] = useState<number>(-1);
   const [descCol, setDescCol] = useState<number>(-1);
   const [amtCol, setAmtCol] = useState<number>(-1);
   const [payerCol, setPayerCol] = useState<number>(-1);
+  const [catCol, setCatCol] = useState<number>(-1);
   const [invertSign, setInvertSign] = useState(false);
+  const catByName = useMemo(() => Object.fromEntries(categories.map((c) => [c.name.toLowerCase(), c.id])), [categories]);
+  const resolveCat = (name: string | undefined) => (name ? catByName[name.trim().toLowerCase()] : null) || defaultCatId || null;
 
   const onFile = async (f: File) => {
     const text = await f.text();

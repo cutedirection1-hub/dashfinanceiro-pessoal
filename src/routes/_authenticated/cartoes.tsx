@@ -487,6 +487,7 @@ function ImportCsvDialog({ allCards, categories, onClose, userId }: { allCards: 
           invoice_month: invoiceMonth(date, card.closing_day, card.due_day),
           payer_name: (payerCol >= 0 ? r[payerCol] : defaultPayer)?.trim() || null,
           recurrence: "none",
+          category_id: resolveCat(catCol >= 0 ? r[catCol] : undefined),
         });
       }
       if (!payload.length) throw new Error("Nenhuma linha válida encontrada");

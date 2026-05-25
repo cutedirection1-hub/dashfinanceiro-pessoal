@@ -629,7 +629,7 @@ function CardDialog({ onClose, userId, editing }: { onClose: () => void; userId:
   );
 }
 
-function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onClose: () => void; userId: string; editing: CTx | null }) {
+function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: Card[]; categories: Category[]; onClose: () => void; userId: string; editing: CTx | null }) {
   const qc = useQueryClient();
   const [cardId, setCardId] = useState(editing?.card_id ?? cards[0]?.id ?? "");
   const [amount, setAmount] = useState(editing ? String(Number(editing.amount) * Number(editing.installment_total)) : "");
@@ -637,6 +637,7 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
   const [date, setDate] = useState(editing?.purchased_on ?? new Date().toISOString().slice(0, 10));
   const [installments, setInstallments] = useState(String(editing?.installment_total ?? "1"));
   const [payer, setPayer] = useState(editing?.payer_name ?? "Eu");
+  const [categoryId, setCategoryId] = useState<string>(editing?.category_id ?? "");
 
   const isSub = editing?.recurrence && editing.recurrence !== "none";
   const [isSubscription, setIsSubscription] = useState<boolean>(!!isSub);

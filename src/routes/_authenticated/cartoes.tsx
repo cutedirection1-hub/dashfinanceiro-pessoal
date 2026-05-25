@@ -655,6 +655,7 @@ function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: 
         const payload: any = {
           card_id: cardId, amount: totalAmount, description: desc || null,
           payer_name: payer.trim() || null, purchased_on: date,
+          category_id: categoryId || null,
         };
         if (applyToFuture && editing.recurrence_group_id) {
           const { error } = await supabase.from("card_transactions").update(payload)

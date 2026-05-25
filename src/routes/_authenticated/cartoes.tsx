@@ -300,11 +300,55 @@ function CartoesPage() {
             </div>
           )}
 
+          {cardTx.length > 0 && (() => {
+            const byCat = cardTx.reduce<Record<string, number>>((acc, t) => {
+              const k = t.category_id || "__none__";
+              acc[k] = (acc[k] || 0) + Number(t.amount);
+              return acc;
+            }, {});
+            const pieData = Object.entries(byCat)
+              .map(([id, val]) => {
+                const c = id === "__none__" ? null : catMap[id];
+                return { name: c?.name || "Sem categoria", value: val, color: c?.color || "#475569" };
+              })
+              .sort((a, b) => b.value - a.value);
+            return (
+              <div className="border-b border-border px-5 py-4">
+                <h3 className="mb-3 text-sm font-medium text-muted-foreground">Gastos por categoria</h3>
+                <div className="grid items-center gap-4 md:grid-cols-2">
+                  <div className="h-56">
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={88} paddingAngle={2}>
+                          {pieData.map((d, i) => <Cell key={i} fill={d.color} stroke="transparent" />)}
+                        </Pie>
+                        <RTooltip contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }} formatter={(v: number) => brl(v)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="space-y-1.5 text-sm">
+                    {pieData.map((d) => {
+                      const pct = (d.value / Math.max(invoiceTotal, 1)) * 100;
+                      return (
+                        <li key={d.name} className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 truncate"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}</span>
+                          <span className="tabular-nums text-muted-foreground">{brl(d.value)} · {pct.toFixed(0)}%</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            );
+          })()}
+
           {cardTx.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</div>
           ) : (
             <ul className="divide-y divide-border">
-              {cardTx.map((t) => (
+              {cardTx.map((t) => {
+                const cat = t.category_id ? catMap[t.category_id] : null;
+                return (
                 <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
                   <div>
                     <div className="font-medium flex items-center gap-2">
@@ -315,6 +359,10 @@ function CartoesPage() {
                           <Repeat className="h-3 w-3" /> {t.recurrence === "monthly" ? "Mensal" : "Anual"}
                         </span>
                       )}
+                      <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground" style={cat ? { borderColor: cat.color + "66", color: cat.color } : undefined}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: cat?.color || "#64748b" }} />
+                        {cat?.name || "Sem categoria"}
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}</div>
                   </div>
@@ -324,7 +372,7 @@ function CartoesPage() {
                     <button onClick={() => handleDelete(t)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </li>
-              ))}
+              );})}
             </ul>
           )}
         </div>

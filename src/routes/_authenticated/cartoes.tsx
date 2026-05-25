@@ -379,8 +379,9 @@ function CartoesPage() {
       )}
 
       {showCard && <CardDialog onClose={() => { setShowCard(false); setEditCard(null); }} userId={user!.id} editing={editCard} />}
-      {showTx && <CardTxDialog cards={cards} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
-      {showImport && <ImportCsvDialog allCards={cards} onClose={() => setShowImport(false)} userId={user!.id} />}
+      {showTx && <CardTxDialog cards={cards} categories={categories} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}
+      {showImport && <ImportCsvDialog allCards={cards} categories={categories} onClose={() => setShowImport(false)} userId={user!.id} />}
+      {showCats && <CategoriesDialog categories={categories} userId={user!.id} onClose={() => setShowCats(false)} />}
       {deletePermCard && (
         <DeletePermDialog
           card={deletePermCard}

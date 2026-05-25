@@ -552,6 +552,12 @@ function ImportCsvDialog({ allCards, categories, onClose, userId }: { allCards: 
                 {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
               </select>
             </Field>
+            <Field label="Coluna Categoria (opcional)">
+              <select value={catCol} onChange={(e) => setCatCol(Number(e.target.value))} className="input">
+                <option value={-1}>—</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+              </select>
+            </Field>
           </div>
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" checked={invertSign} onChange={(e) => setInvertSign(e.target.checked)} />

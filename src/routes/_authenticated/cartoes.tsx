@@ -449,6 +449,7 @@ function ImportCsvDialog({ allCards, categories, onClose, userId }: { allCards: 
     setDescCol(find(["desc", "histor", "estabel", "merchant", "lançamento", "lancamento"]));
     setAmtCol(find(["valor", "amount", "montante", "r$"]));
     setPayerCol(find(["resp", "titular", "portador"]));
+    setCatCol(find(["categ"]));
     setStep("map");
   };
 

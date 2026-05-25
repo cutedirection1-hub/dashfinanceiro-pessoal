@@ -625,6 +625,32 @@ function CardTxDialog({ cards, onClose, userId, editing }: { cards: Card[]; onCl
           )}
         </div>
 
+        {(() => {
+          const c = cards.find((x) => x.id === cardId);
+          const a = Number(amount);
+          if (!c || !date || !a) return null;
+          const total = isSubscription ? 1 : Math.max(1, Number(installments) || 1);
+          const parcel = +(a / total).toFixed(2);
+          const first = invoiceMonth(date, c.closing_day, c.due_day);
+          const due = invoiceDueDate(first, c.due_day);
+          const purchasedDay = Number(date.slice(8, 10));
+          const afterClose = purchasedDay > c.closing_day;
+          return (
+            <div className={`rounded-lg border p-3 text-xs space-y-1 ${afterClose ? "border-amber-500/40 bg-amber-500/10" : "border-primary/30 bg-primary/5"}`}>
+              <div className="flex items-center gap-1.5 font-medium">
+                <Info className="h-3.5 w-3.5" />
+                {isSubscription ? "Primeira cobrança" : (total > 1 ? `Parcela 1/${total}` : "Esta compra")} entra na fatura de <span className="underline">{monthLabel(first)}</span> (vence {fmtDate(due)})
+              </div>
+              {afterClose && <div className="text-amber-700 dark:text-amber-400">⚠ Compra após o fechamento (dia {c.closing_day}) — cai na próxima fatura.</div>}
+              {!isSubscription && total > 1 && (
+                <div className="text-muted-foreground">
+                  {total}× de {brl(parcel)} · última parcela: {monthLabel(addMonths(first, total - 1))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {!editing && (
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
             <label className="flex items-center gap-2 text-sm">

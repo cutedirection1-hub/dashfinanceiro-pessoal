@@ -687,7 +687,7 @@ function CardTxDialog({ cards, categories, onClose, userId, editing }: { cards: 
           purchased_on: date, installment_no: 1, installment_total: 1,
           invoice_month: addMonths(firstInvoice, i * step),
           payer_name: payer.trim() || null,
-          recurrence, recurrence_group_id,
+          recurrence, recurrence_group_id, category_id: categoryId || null,
         }));
         const { error } = await supabase.from("card_transactions").insert(rows);
         if (error) throw error;

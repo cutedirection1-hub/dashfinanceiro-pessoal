@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye, Search, X as XIcon } from "lucide-react";
+import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/contas")({ component: ContasPage });
 
@@ -20,21 +20,12 @@ function ContasPage() {
   const [editTx, setEditTx] = useState<Tx | null>(null);
   const [showArchived, setShowArchived] = useState(false);
 
-  // Filtros de lançamentos
-  const [fAccount, setFAccount] = useState<string>("all");
-  const [fKind, setFKind] = useState<"all" | "income" | "expense">("all");
-  const [fFrom, setFFrom] = useState<string>("");
-  const [fTo, setFTo] = useState<string>("");
-  const [fSearch, setFSearch] = useState<string>("");
-  const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim();
-  const txLimit = hasFilter ? 1000 : 100;
-
   const { data } = useQuery({
-    queryKey: ["contas", showArchived, txLimit],
+    queryKey: ["contas", showArchived],
     queryFn: async () => {
       const [a, t] = await Promise.all([
         supabase.from("accounts").select("*").eq("archived", showArchived).order("created_at"),
-        supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(txLimit),
+        supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(100),
       ]);
       return { accounts: (a.data ?? []) as Account[], tx: (t.data ?? []) as Tx[] };
     },
@@ -111,101 +102,34 @@ function ContasPage() {
         {!accounts.length && <EmptyState text={showArchived ? "Nenhuma conta arquivada." : "Nenhuma conta cadastrada ainda."} />}
       </div>
 
-      {tx.length > 0 && (() => {
-        const filtered = tx.filter((t) => {
-          if (fAccount !== "all" && t.account_id !== fAccount) return false;
-          if (fKind !== "all" && t.kind !== fKind) return false;
-          if (fFrom && t.occurred_on < fFrom) return false;
-          if (fTo && t.occurred_on > fTo) return false;
-          if (fSearch.trim()) {
-            const q = fSearch.trim().toLowerCase();
-            if (!(t.description || "").toLowerCase().includes(q)) return false;
-          }
-          return true;
-        });
-        const filteredTotal = filtered.reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
-        const clearAll = () => { setFAccount("all"); setFKind("all"); setFFrom(""); setFTo(""); setFSearch(""); };
-        return (
+      {tx.length > 0 && (
         <div className="mt-8 rounded-2xl border border-border bg-card">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-            <div>
-              <h2 className="font-semibold">Lançamentos</h2>
-              <p className="text-xs text-muted-foreground">
-                {filtered.length} de {tx.length}{!hasFilter && tx.length >= txLimit && <> · mostrando últimos {txLimit} — use filtros para ver mais</>}
-                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{brl(filteredTotal)}</span>
-              </p>
-            </div>
-            {hasFilter && (
-              <button onClick={clearAll} className="btn-secondary text-xs"><XIcon className="h-3.5 w-3.5" /> Limpar filtros</button>
-            )}
-          </div>
-
-          <div className="grid gap-3 border-b border-border bg-secondary/20 px-5 py-3 md:grid-cols-5">
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Conta</span>
-              <select value={fAccount} onChange={(e) => setFAccount(e.target.value)} className="input h-9 py-0 text-sm">
-                <option value="all">Todas</option>
-                {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Tipo</span>
-              <div className="flex gap-1">
-                {(["all", "income", "expense"] as const).map((k) => (
-                  <button key={k} type="button" onClick={() => setFKind(k)}
-                    className={`flex-1 rounded-md px-2 py-1.5 text-xs transition ${fKind === k ? (k === "expense" ? "bg-destructive/20 text-destructive ring-1 ring-destructive/40" : k === "income" ? "bg-primary/20 text-primary ring-1 ring-primary/40" : "bg-foreground/10 ring-1 ring-foreground/20") : "bg-card text-muted-foreground hover:bg-accent"}`}>
-                    {k === "all" ? "Todos" : k === "income" ? "Entrada" : "Saída"}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-muted-foreground">De</span>
-              <input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className="input h-9 py-0 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Até</span>
-              <input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className="input h-9 py-0 text-sm" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Buscar descrição</span>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Mercado, Uber..." className="input h-9 py-0 pl-7 text-sm" />
-              </div>
-            </label>
-          </div>
-
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento corresponde aos filtros.</div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {filtered.map((t) => {
-                const acct = accounts.find((a) => a.id === t.account_id);
-                return (
-                  <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                    <div className="flex items-center gap-3">
-                      {t.kind === "income" ? <ArrowDownLeft className="h-4 w-4 text-primary" /> : <ArrowUpRight className="h-4 w-4 text-destructive" />}
-                      <div>
-                        <div className="font-medium">{t.description || (t.kind === "income" ? "Entrada" : "Saída")}</div>
-                        <div className="text-xs text-muted-foreground">{acct?.name} · {fmtDate(t.occurred_on)}</div>
-                      </div>
+          <div className="border-b border-border px-5 py-4"><h2 className="font-semibold">Últimos lançamentos</h2></div>
+          <ul className="divide-y divide-border">
+            {tx.map((t) => {
+              const acct = accounts.find((a) => a.id === t.account_id);
+              return (
+                <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
+                  <div className="flex items-center gap-3">
+                    {t.kind === "income" ? <ArrowDownLeft className="h-4 w-4 text-primary" /> : <ArrowUpRight className="h-4 w-4 text-destructive" />}
+                    <div>
+                      <div className="font-medium">{t.description || (t.kind === "income" ? "Entrada" : "Saída")}</div>
+                      <div className="text-xs text-muted-foreground">{acct?.name} · {fmtDate(t.occurred_on)}</div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`font-medium tabular-nums ${t.kind === "income" ? "text-primary" : ""}`}>
-                        {t.kind === "income" ? "+" : "-"}{brl(t.amount)}
-                      </div>
-                      <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => confirm("Remover este lançamento?") && delTx.mutate(t.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`font-medium tabular-nums ${t.kind === "income" ? "text-primary" : ""}`}>
+                      {t.kind === "income" ? "+" : "-"}{brl(t.amount)}
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => confirm("Remover este lançamento?") && delTx.mutate(t.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-        );
-      })()}
+      )}
 
       {showAcct && <NewAccountDialog onClose={() => setShowAcct(false)} userId={user!.id} />}
       {showTx && <TxDialog accounts={accounts} onClose={() => { setShowTx(false); setEditTx(null); }} userId={user!.id} editing={editTx} />}

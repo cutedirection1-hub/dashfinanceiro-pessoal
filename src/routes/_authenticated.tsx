@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, CreditCard, TrendingUp, FileText, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, Wallet, CreditCard, TrendingUp, LogOut, Menu, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,7 +13,6 @@ const NAV = [
   { to: "/contas", label: "Contas", icon: Wallet },
   { to: "/cartoes", label: "Cartões", icon: CreditCard },
   { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
-  { to: "/fatura-pdf", label: "Fatura PDF", icon: FileText },
 ] as const;
 
 function AuthenticatedLayout() {

@@ -135,6 +135,13 @@ function InvestimentosPage() {
                     <div className="text-right">
                       <div className="text-xs text-muted-foreground">Aportado {brl(aportado)}</div>
                       <div className="tabular-nums font-medium">{brl(valor)}</div>
+                      {aportado > 0 && (() => {
+                        const r = valor - aportado;
+                        const pct = (r / aportado) * 100;
+                        const cls = r < 0 ? "text-destructive" : r > 0 ? "text-emerald-500" : "text-muted-foreground";
+                        const arr = r < 0 ? "↓" : r > 0 ? "↑" : "·";
+                        return <div className={`text-[11px] tabular-nums ${cls}`}>{arr} {brl(r)} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)</div>;
+                      })()}
                     </div>
                     <button onClick={() => setContribFor(i)} className="ml-2 text-primary hover:underline text-xs whitespace-nowrap">+ Aporte</button>
                     <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Editar ativo / atualizar saldo"><RefreshCw className="h-4 w-4" /></button>

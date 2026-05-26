@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedInvestimentosRouteImport } from './routes/_authenticated/investimentos'
+import { Route as AuthenticatedFaturaPdfRouteImport } from './routes/_authenticated/fatura-pdf'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedContasRouteImport } from './routes/_authenticated/contas'
 import { Route as AuthenticatedCartoesRouteImport } from './routes/_authenticated/cartoes'
@@ -43,6 +44,11 @@ const AuthenticatedInvestimentosRoute =
     path: '/investimentos',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedFaturaPdfRoute = AuthenticatedFaturaPdfRouteImport.update({
+  id: '/fatura-pdf',
+  path: '/fatura-pdf',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/cartoes': typeof AuthenticatedCartoesRoute
   '/contas': typeof AuthenticatedContasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/fatura-pdf': typeof AuthenticatedFaturaPdfRoute
   '/investimentos': typeof AuthenticatedInvestimentosRoute
 }
 export interface FileRoutesByTo {
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/cartoes': typeof AuthenticatedCartoesRoute
   '/contas': typeof AuthenticatedContasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/fatura-pdf': typeof AuthenticatedFaturaPdfRoute
   '/investimentos': typeof AuthenticatedInvestimentosRoute
 }
 export interface FileRoutesById {
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/_authenticated/cartoes': typeof AuthenticatedCartoesRoute
   '/_authenticated/contas': typeof AuthenticatedContasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/fatura-pdf': typeof AuthenticatedFaturaPdfRoute
   '/_authenticated/investimentos': typeof AuthenticatedInvestimentosRoute
 }
 export interface FileRouteTypes {
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/cartoes'
     | '/contas'
     | '/dashboard'
+    | '/fatura-pdf'
     | '/investimentos'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/cartoes'
     | '/contas'
     | '/dashboard'
+    | '/fatura-pdf'
     | '/investimentos'
   id:
     | '__root__'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cartoes'
     | '/_authenticated/contas'
     | '/_authenticated/dashboard'
+    | '/_authenticated/fatura-pdf'
     | '/_authenticated/investimentos'
   fileRoutesById: FileRoutesById
 }
@@ -163,6 +175,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvestimentosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/fatura-pdf': {
+      id: '/_authenticated/fatura-pdf'
+      path: '/fatura-pdf'
+      fullPath: '/fatura-pdf'
+      preLoaderRoute: typeof AuthenticatedFaturaPdfRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -191,6 +210,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCartoesRoute: typeof AuthenticatedCartoesRoute
   AuthenticatedContasRoute: typeof AuthenticatedContasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFaturaPdfRoute: typeof AuthenticatedFaturaPdfRoute
   AuthenticatedInvestimentosRoute: typeof AuthenticatedInvestimentosRoute
 }
 
@@ -198,6 +218,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCartoesRoute: AuthenticatedCartoesRoute,
   AuthenticatedContasRoute: AuthenticatedContasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFaturaPdfRoute: AuthenticatedFaturaPdfRoute,
   AuthenticatedInvestimentosRoute: AuthenticatedInvestimentosRoute,
 }
 

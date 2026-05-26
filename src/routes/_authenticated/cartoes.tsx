@@ -288,16 +288,17 @@ function CartoesPage() {
       </div>
 
 
-      {activeCard && (
+      {(activeCard || isAll) && (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
-              <h2 className="font-semibold">Fatura — {monthLabel(ymRef)}</h2>
+              <h2 className="font-semibold">{isAll ? "Fatura consolidada" : "Fatura"} — {monthLabel(ymRef)}</h2>
               <p className="text-xs text-muted-foreground">
                 Total: {brl(invoiceTotal)}
-                {cards.find((c) => c.id === activeCard) && (
+                {!isAll && cards.find((c) => c.id === activeCard) && (
                   <> · Vence em {fmtDate(invoiceDueDate(ymRef, cards.find((c) => c.id === activeCard)!.due_day))}</>
                 )}
+                {isAll && <> · {cards.length} cartões somados</>}
               </p>
             </div>
             <div className="flex items-center gap-1">

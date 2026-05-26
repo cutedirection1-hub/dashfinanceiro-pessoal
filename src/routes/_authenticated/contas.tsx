@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye } from "lucide-react";
+import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye, Search, X as XIcon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/contas")({ component: ContasPage });
 
@@ -20,12 +20,21 @@ function ContasPage() {
   const [editTx, setEditTx] = useState<Tx | null>(null);
   const [showArchived, setShowArchived] = useState(false);
 
+  // Filtros de lançamentos
+  const [fAccount, setFAccount] = useState<string>("all");
+  const [fKind, setFKind] = useState<"all" | "income" | "expense">("all");
+  const [fFrom, setFFrom] = useState<string>("");
+  const [fTo, setFTo] = useState<string>("");
+  const [fSearch, setFSearch] = useState<string>("");
+  const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim();
+  const txLimit = hasFilter ? 1000 : 100;
+
   const { data } = useQuery({
-    queryKey: ["contas", showArchived],
+    queryKey: ["contas", showArchived, txLimit],
     queryFn: async () => {
       const [a, t] = await Promise.all([
         supabase.from("accounts").select("*").eq("archived", showArchived).order("created_at"),
-        supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(100),
+        supabase.from("account_transactions").select("*").order("occurred_on", { ascending: false }).limit(txLimit),
       ]);
       return { accounts: (a.data ?? []) as Account[], tx: (t.data ?? []) as Tx[] };
     },

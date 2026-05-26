@@ -93,12 +93,16 @@ function CartoesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   }, [monthOffset]);
 
+  const isAll = selectedCard === "__all__";
   const activeCard = selectedCard ?? cards[0]?.id;
-  const allCardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
+  const allCardTx = isAll
+    ? tx.filter((t) => t.invoice_month === ymRef && cards.some((c) => c.id === t.card_id))
+    : tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
   const cardTx = payerFilter === "all"
     ? allCardTx
     : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter);
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
+  const cardMap = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
 
   const byPayer = allCardTx.reduce<Record<string, number>>((acc, t) => {
     const k = t.payer_name?.trim() || "Eu";
@@ -210,11 +214,41 @@ function CartoesPage() {
       </Header>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {cards.length > 1 && (() => {
+          const totalMonth = tx.filter((t) => t.invoice_month === ymRef && cards.some((c) => c.id === t.card_id)).reduce((s, t) => s + Number(t.amount), 0);
+          const totalUsed = tx.filter((t) => t.invoice_month >= ymRef && cards.some((c) => c.id === t.card_id)).reduce((s, t) => s + Number(t.amount), 0);
+          const totalLimit = cards.reduce((s, c) => s + Number(c.credit_limit), 0);
+          const usedPct = Math.min(100, (totalUsed / Math.max(totalLimit, 1)) * 100);
+          const active = isAll;
+          return (
+            <div key="__all__" onClick={() => setSelectedCard("__all__")} role="button" tabIndex={0}
+              className={`cursor-pointer text-left rounded-2xl border-2 border-dashed p-5 transition ${active ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40"}`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold">Todos os cartões</h3>
+                  <p className="text-xs text-muted-foreground">{cards.length} cartões · visão consolidada</p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-xs text-muted-foreground">Fatura do mês (soma)</div>
+                <div className="text-2xl font-semibold">{brl(totalMonth)}</div>
+              </div>
+              <div className="mt-3">
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>Limite usado (futuro)</span><span>{brl(totalUsed)} / {brl(totalLimit)}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {cards.map((c) => {
           const monthSpend = tx.filter((t) => t.card_id === c.id && t.invoice_month === ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const used = tx.filter((t) => t.card_id === c.id && t.invoice_month >= ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
-          const active = activeCard === c.id;
+          const active = !isAll && activeCard === c.id;
           return (
             <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
               className={`cursor-pointer text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
@@ -253,16 +287,18 @@ function CartoesPage() {
         {!cards.length && <EmptyState text={showArchived ? "Nenhum cartão arquivado." : "Cadastre seu primeiro cartão para começar."} />}
       </div>
 
-      {activeCard && (
+
+      {(activeCard || isAll) && (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
-              <h2 className="font-semibold">Fatura — {monthLabel(ymRef)}</h2>
+              <h2 className="font-semibold">{isAll ? "Fatura consolidada" : "Fatura"} — {monthLabel(ymRef)}</h2>
               <p className="text-xs text-muted-foreground">
                 Total: {brl(invoiceTotal)}
-                {cards.find((c) => c.id === activeCard) && (
+                {!isAll && cards.find((c) => c.id === activeCard) && (
                   <> · Vence em {fmtDate(invoiceDueDate(ymRef, cards.find((c) => c.id === activeCard)!.due_day))}</>
                 )}
+                {isAll && <> · {cards.length} cartões somados</>}
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -364,7 +400,7 @@ function CartoesPage() {
                         {cat?.name || "Sem categoria"}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}</div>
+                    <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}{isAll && cardMap[t.card_id] && <> · <span className="text-foreground/70">{cardMap[t.card_id].name}</span></>}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium tabular-nums">{brl(t.amount)}</span>

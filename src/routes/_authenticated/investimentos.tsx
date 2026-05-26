@@ -76,22 +76,34 @@ function InvestimentosPage() {
     inv.reduce<Record<string, number>>((acc, i) => { const v = valueOf(i); acc[i.asset_class] = (acc[i.asset_class] || 0) + v; return acc; }, {})
   ).sort((a, b) => b[1] - a[1]);
 
+  const pnlPct = totalAporte > 0 ? (pnl / totalAporte) * 100 : 0;
+  const pnlColor = pnl < 0 ? "text-destructive" : pnl > 0 ? "text-emerald-500" : "text-muted-foreground";
+  const pnlArrow = pnl < 0 ? "↓" : pnl > 0 ? "↑" : "·";
+
   return (
     <div>
-      <Header title="Investimentos" subtitle={`Patrimônio: ${brl(total)} · Aportado: ${brl(totalAporte)} · Resultado: ${brl(pnl)}`}>
+      <Header title="Investimentos">
         <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo ativo</button>
       </Header>
+      <div className="mt-1 text-sm text-muted-foreground">
+        Patrimônio: <span className="font-medium text-foreground">{brl(total)}</span> · Aportado: {brl(totalAporte)} ·{" "}
+        <span className={`font-medium ${pnlColor}`}>{pnlArrow} Resultado: {brl(pnl)}{totalAporte > 0 && <span className="text-xs"> ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)</span>}</span>
+      </div>
 
       {allocation.length > 0 && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Alocação</h2>
           <div className="mt-4 space-y-2">
-            {allocation.map(([cls, v]) => (
-              <div key={cls}>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-muted-foreground">{CLASSES[cls] || cls}</span><span>{brl(v)} · {((v / total) * 100).toFixed(1)}%</span></div>
-                <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-primary" style={{ width: `${(v / total) * 100}%` }} /></div>
-              </div>
-            ))}
+            {allocation.map(([cls, v]) => {
+              const aportadoCls = inv.filter((i) => i.asset_class === cls).reduce((s, i) => s + aporteOf(i), 0);
+              const clsNeg = v < aportadoCls;
+              return (
+                <div key={cls}>
+                  <div className="mb-1 flex justify-between text-xs"><span className={clsNeg ? "text-destructive" : "text-muted-foreground"}>{CLASSES[cls] || cls}{clsNeg && " ↓"}</span><span>{brl(v)} · {((v / total) * 100).toFixed(1)}%</span></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full ${clsNeg ? "bg-destructive" : "bg-primary"}`} style={{ width: `${(v / total) * 100}%` }} /></div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -123,6 +135,13 @@ function InvestimentosPage() {
                     <div className="text-right">
                       <div className="text-xs text-muted-foreground">Aportado {brl(aportado)}</div>
                       <div className="tabular-nums font-medium">{brl(valor)}</div>
+                      {aportado > 0 && (() => {
+                        const r = valor - aportado;
+                        const pct = (r / aportado) * 100;
+                        const cls = r < 0 ? "text-destructive" : r > 0 ? "text-emerald-500" : "text-muted-foreground";
+                        const arr = r < 0 ? "↓" : r > 0 ? "↑" : "·";
+                        return <div className={`text-[11px] tabular-nums ${cls}`}>{arr} {brl(r)} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)</div>;
+                      })()}
                     </div>
                     <button onClick={() => setContribFor(i)} className="ml-2 text-primary hover:underline text-xs whitespace-nowrap">+ Aporte</button>
                     <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Editar ativo / atualizar saldo"><RefreshCw className="h-4 w-4" /></button>

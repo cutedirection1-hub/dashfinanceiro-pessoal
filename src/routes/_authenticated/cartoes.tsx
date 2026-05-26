@@ -93,12 +93,16 @@ function CartoesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   }, [monthOffset]);
 
+  const isAll = selectedCard === "__all__";
   const activeCard = selectedCard ?? cards[0]?.id;
-  const allCardTx = tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
+  const allCardTx = isAll
+    ? tx.filter((t) => t.invoice_month === ymRef && cards.some((c) => c.id === t.card_id))
+    : tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
   const cardTx = payerFilter === "all"
     ? allCardTx
     : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter);
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
+  const cardMap = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
 
   const byPayer = allCardTx.reduce<Record<string, number>>((acc, t) => {
     const k = t.payer_name?.trim() || "Eu";

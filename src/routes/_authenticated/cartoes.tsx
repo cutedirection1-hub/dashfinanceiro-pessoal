@@ -214,11 +214,41 @@ function CartoesPage() {
       </Header>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {cards.length > 1 && (() => {
+          const totalMonth = tx.filter((t) => t.invoice_month === ymRef && cards.some((c) => c.id === t.card_id)).reduce((s, t) => s + Number(t.amount), 0);
+          const totalUsed = tx.filter((t) => t.invoice_month >= ymRef && cards.some((c) => c.id === t.card_id)).reduce((s, t) => s + Number(t.amount), 0);
+          const totalLimit = cards.reduce((s, c) => s + Number(c.credit_limit), 0);
+          const usedPct = Math.min(100, (totalUsed / Math.max(totalLimit, 1)) * 100);
+          const active = isAll;
+          return (
+            <div key="__all__" onClick={() => setSelectedCard("__all__")} role="button" tabIndex={0}
+              className={`cursor-pointer text-left rounded-2xl border-2 border-dashed p-5 transition ${active ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40"}`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold">Todos os cartões</h3>
+                  <p className="text-xs text-muted-foreground">{cards.length} cartões · visão consolidada</p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-xs text-muted-foreground">Fatura do mês (soma)</div>
+                <div className="text-2xl font-semibold">{brl(totalMonth)}</div>
+              </div>
+              <div className="mt-3">
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                  <span>Limite usado (futuro)</span><span>{brl(totalUsed)} / {brl(totalLimit)}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {cards.map((c) => {
           const monthSpend = tx.filter((t) => t.card_id === c.id && t.invoice_month === ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const used = tx.filter((t) => t.card_id === c.id && t.invoice_month >= ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
-          const active = activeCard === c.id;
+          const active = !isAll && activeCard === c.id;
           return (
             <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
               className={`cursor-pointer text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
@@ -256,6 +286,7 @@ function CartoesPage() {
         })}
         {!cards.length && <EmptyState text={showArchived ? "Nenhum cartão arquivado." : "Cadastre seu primeiro cartão para começar."} />}
       </div>
+
 
       {activeCard && (
         <div className="mt-8 rounded-2xl border border-border bg-card">

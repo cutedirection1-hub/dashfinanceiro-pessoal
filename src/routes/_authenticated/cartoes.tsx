@@ -400,7 +400,7 @@ function CartoesPage() {
                         {cat?.name || "Sem categoria"}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}</div>
+                    <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}{isAll && cardMap[t.card_id] && <> · <span className="text-foreground/70">{cardMap[t.card_id].name}</span></>}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium tabular-nums">{brl(t.amount)}</span>

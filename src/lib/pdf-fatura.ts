@@ -192,13 +192,14 @@ function parseBrBank(text: string, year: number): ParsedTx[] {
 export function parseInvoice(text: string, issuer: Issuer, yearHint?: number): ParsedTx[] {
   const year = yearHint ?? inferYear(text);
   switch (issuer) {
-    case "nubank": return parseNubank(text, year);
+    case "nubank":
+    case "c6":
+      return parseNubank(text, year);
     case "itau":
     case "bradesco":
     case "santander":
     case "bb":
     case "inter":
-    case "c6":
       return parseBrBank(text, year);
     default:
       return parseGeneric(text, year);

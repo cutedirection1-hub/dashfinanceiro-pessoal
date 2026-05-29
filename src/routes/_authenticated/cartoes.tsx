@@ -43,6 +43,7 @@ function CartoesPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
   const [payerFilter, setPayerFilter] = useState<string>("all");
+  const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const [showArchived, setShowArchived] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [deletePermCard, setDeletePermCard] = useState<Card | null>(null);
@@ -378,11 +379,21 @@ function CartoesPage() {
             );
           })()}
 
+          {cardTx.length > 0 && (
+            <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-5 py-2">
+              <span className="text-xs font-medium text-muted-foreground">Lançamentos</span>
+              <select value={fSort} onChange={(e) => setFSort(e.target.value as "desc" | "asc")} className="input h-8 py-0 text-xs w-auto">
+                <option value="desc">Mais recentes</option>
+                <option value="asc">Mais antigos</option>
+              </select>
+            </div>
+          )}
+
           {cardTx.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</div>
           ) : (
             <ul className="divide-y divide-border">
-              {cardTx.map((t) => {
+              {[...cardTx].sort((a, b) => fSort === "desc" ? b.purchased_on.localeCompare(a.purchased_on) : a.purchased_on.localeCompare(b.purchased_on)).map((t) => {
                 const cat = t.category_id ? catMap[t.category_id] : null;
                 return (
                 <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">

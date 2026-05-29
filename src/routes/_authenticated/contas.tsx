@@ -26,7 +26,8 @@ function ContasPage() {
   const [fFrom, setFFrom] = useState<string>("");
   const [fTo, setFTo] = useState<string>("");
   const [fSearch, setFSearch] = useState<string>("");
-  const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim();
+  const [fSort, setFSort] = useState<"desc" | "asc">("desc");
+  const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim() || fSort !== "desc";
   const txLimit = hasFilter ? 1000 : 100;
 
   const { data } = useQuery({
@@ -123,8 +124,9 @@ function ContasPage() {
           }
           return true;
         });
+        filtered.sort((a, b) => fSort === "desc" ? b.occurred_on.localeCompare(a.occurred_on) : a.occurred_on.localeCompare(b.occurred_on));
         const filteredTotal = filtered.reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
-        const clearAll = () => { setFAccount("all"); setFKind("all"); setFFrom(""); setFTo(""); setFSearch(""); };
+        const clearAll = () => { setFAccount("all"); setFKind("all"); setFFrom(""); setFTo(""); setFSearch(""); setFSort("desc"); };
         return (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -140,7 +142,7 @@ function ContasPage() {
             )}
           </div>
 
-          <div className="grid gap-3 border-b border-border bg-secondary/20 px-5 py-3 md:grid-cols-5">
+          <div className="grid gap-3 border-b border-border bg-secondary/20 px-5 py-3 md:grid-cols-3 lg:grid-cols-6">
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Conta</span>
               <select value={fAccount} onChange={(e) => setFAccount(e.target.value)} className="input h-9 py-0 text-sm">
@@ -173,6 +175,13 @@ function ContasPage() {
                 <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="Mercado, Uber..." className="input h-9 py-0 pl-7 text-sm" />
               </div>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Ordem</span>
+              <select value={fSort} onChange={(e) => setFSort(e.target.value as "desc" | "asc")} className="input h-9 py-0 text-sm">
+                <option value="desc">Mais recentes</option>
+                <option value="asc">Mais antigos</option>
+              </select>
             </label>
           </div>
 

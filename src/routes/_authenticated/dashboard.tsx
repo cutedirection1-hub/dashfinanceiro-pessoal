@@ -20,6 +20,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
+  const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
@@ -178,57 +179,46 @@ function DashboardPage() {
       )}
 
       <div className="mt-6 rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold">Evolução de gastos</h2>
-        <p className="text-xs text-muted-foreground">6 meses até {monthLabel(ref.ym)} (contas + cartões)</p>
-        <div className="mt-4 h-64">
-          <ResponsiveContainer>
-            <LineChart data={chart}>
-              <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
-              <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
-              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} />
-              <Tooltip
-                contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
-                formatter={(v: number) => brl(v)}
-              />
-              <Line type="monotone" dataKey="gasto" stroke="oklch(0.78 0.18 155)" strokeWidth={2.5} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <select value={activeChart} onChange={(e) => setActiveChart(e.target.value as any)} className="input py-0 h-8 text-sm w-auto font-semibold bg-secondary/50">
+                <option value="patrimonio">Evolução do patrimônio</option>
+                <option value="gasto">Evolução de gastos</option>
+                <option value="investimentos">Evolução dos investimentos</option>
+              </select>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {activeChart === "patrimonio" && `6 meses até ${monthLabel(ref.ym)} (contas + investimentos − fatura)`}
+              {activeChart === "gasto" && `6 meses até ${monthLabel(ref.ym)} (contas + cartões)`}
+              {activeChart === "investimentos" && `6 meses até ${monthLabel(ref.ym)} (posição reconstruída por aportes e resgates)`}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+            <button onClick={() => {
+              const ids = ["patrimonio", "gasto", "investimentos"] as const;
+              setActiveChart(ids[(ids.indexOf(activeChart) - 1 + ids.length) % ids.length]);
+            }} className="rounded-md p-1 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
+            <button onClick={() => {
+              const ids = ["patrimonio", "gasto", "investimentos"] as const;
+              setActiveChart(ids[(ids.indexOf(activeChart) + 1) % ids.length]);
+            }} className="rounded-md p-1 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-6 rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold">Evolução do patrimônio</h2>
-        <p className="text-xs text-muted-foreground">6 meses até {monthLabel(ref.ym)} (contas + investimentos − fatura)</p>
         <div className="mt-4 h-64">
           <ResponsiveContainer>
             <LineChart data={chart}>
               <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
               <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
-              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} />
+              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} width={80} />
               <Tooltip
                 contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
                 formatter={(v: number) => brl(v)}
               />
-              <Line type="monotone" dataKey="patrimonio" stroke="oklch(0.72 0.18 265)" strokeWidth={2.5} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold">Evolução dos investimentos</h2>
-        <p className="text-xs text-muted-foreground">6 meses até {monthLabel(ref.ym)} (posição reconstruída por aportes e resgates)</p>
-        <div className="mt-4 h-64">
-          <ResponsiveContainer>
-            <LineChart data={chart}>
-              <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
-              <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
-              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} />
-              <Tooltip
-                contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
-                formatter={(v: number) => brl(v)}
-              />
-              <Line type="monotone" dataKey="investimentos" stroke="oklch(0.75 0.16 50)" strokeWidth={2.5} dot={{ r: 4 }} />
+              {activeChart === "patrimonio" && <Line type="monotone" dataKey="patrimonio" stroke="oklch(0.72 0.18 265)" strokeWidth={2.5} dot={{ r: 4 }} />}
+              {activeChart === "gasto" && <Line type="monotone" dataKey="gasto" stroke="oklch(0.78 0.18 155)" strokeWidth={2.5} dot={{ r: 4 }} />}
+              {activeChart === "investimentos" && <Line type="monotone" dataKey="investimentos" stroke="oklch(0.75 0.16 50)" strokeWidth={2.5} dot={{ r: 4 }} />}
             </LineChart>
           </ResponsiveContainer>
         </div>

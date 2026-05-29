@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/investimentos")({ component: InvestimentosPage });
@@ -36,6 +36,9 @@ function InvestimentosPage() {
   const [editing, setEditing] = useState<Inv | null>(null);
   const [contribFor, setContribFor] = useState<Inv | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [fSearch, setFSearch] = useState("");
+  const [fClass, setFClass] = useState("all");
+  const [fAccount, setFAccount] = useState("all");
 
   const { data } = useQuery({
     queryKey: ["inv"],
@@ -106,15 +109,52 @@ function InvestimentosPage() {
             })}
           </div>
         </div>
+        </div>
       )}
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
-        {inv.length === 0 ? (
-          <EmptyState text="Adicione seus ativos para acompanhar a carteira." />
-        ) : (
-          <ul className="divide-y divide-border">
-            {inv.map((i) => {
-              const bank = accounts.find((a) => a.id === i.funding_account_id)?.name;
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3">
+        <div className="flex-1 relative min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={fSearch}
+            onChange={(e) => setFSearch(e.target.value)}
+            placeholder="Buscar por nome ou ticker..."
+            className="input pl-9 h-9 w-full"
+          />
+        </div>
+        <select value={fClass} onChange={(e) => setFClass(e.target.value)} className="input h-9 w-auto text-sm">
+          <option value="all">Todas as classes</option>
+          {Object.entries(CLASSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select value={fAccount} onChange={(e) => setFAccount(e.target.value)} className="input h-9 w-auto text-sm">
+          <option value="all">Todos os bancos</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        {(fSearch || fClass !== "all" || fAccount !== "all") && (
+          <button onClick={() => { setFSearch(""); setFClass("all"); setFAccount("all"); }} className="btn-secondary text-xs h-9"><XIcon className="h-3.5 w-3.5" /> Limpar</button>
+        )}
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
+        {(() => {
+          const filteredInv = inv.filter((i) => {
+            if (fClass !== "all" && i.asset_class !== fClass) return false;
+            if (fAccount !== "all" && (i.funding_account_id || "") !== (fAccount === "none" ? "" : fAccount)) return false;
+            if (fSearch.trim()) {
+              const q = fSearch.trim().toLowerCase();
+              if (!(i.name.toLowerCase().includes(q) || (i.ticker || "").toLowerCase().includes(q))) return false;
+            }
+            return true;
+          });
+
+          if (filteredInv.length === 0) {
+            return <EmptyState text={inv.length === 0 ? "Adicione seus ativos para acompanhar a carteira." : "Nenhum ativo corresponde aos filtros."} />;
+          }
+
+          return (
+            <ul className="divide-y divide-border">
+              {filteredInv.map((i) => {
+                const bank = accounts.find((a) => a.id === i.funding_account_id)?.name;
               const myContribs = contribs.filter((c) => c.investment_id === i.id);
               const aportado = aporteOf(i);
               const valor = valueOf(i);
@@ -154,7 +194,7 @@ function InvestimentosPage() {
               );
             })}
           </ul>
-        )}
+        );})()}
       </div>
 
       {show && <InvDialog onClose={() => setShow(false)} userId={user!.id} editing={editing} accounts={accounts} />}

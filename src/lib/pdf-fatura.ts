@@ -44,7 +44,7 @@ export async function extractPdfText(file: File, password?: string): Promise<str
       const items = (content.items as any[]).filter((i) => "str" in i);
       const buckets = new Map<number, { x: number; str: string }[]>();
       for (const it of items) {
-        const y = Math.round((it.transform?.[5] ?? 0) * 10) / 10;
+        const y = Math.round(it.transform?.[5] ?? 0);
         const x = it.transform?.[4] ?? 0;
         if (!buckets.has(y)) buckets.set(y, []);
         buckets.get(y)!.push({ x, str: it.str });

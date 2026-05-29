@@ -57,6 +57,7 @@ function FaturaPdfPage() {
       setRows(parsed);
       setSelected(parsed.map(() => true));
       setNeedsPassword(false);
+      console.log("TEXTO EXTRAÍDO DO PDF:\n", text); // Para ajudar no debug se não achar linhas
       if (parsed.length === 0) toast.warning("Nenhuma linha detectada. Tente trocar o emissor manualmente.");
       else toast.success(`${parsed.length} linha(s) detectada(s) (${ISSUER_LABEL[iss]})`);
     } catch (e: any) {

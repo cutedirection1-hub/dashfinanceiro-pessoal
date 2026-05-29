@@ -39,7 +39,7 @@ function AuthenticatedLayout() {
         <div className="flex h-16 items-center justify-between px-5">
           <Link to="/dashboard" className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">M</div>
-            <span className="font-display font-semibold">Meu Financeiro</span>
+            <span className="font-display font-semibold">DashFinanceiro</span>
           </Link>
           <button className="md:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
         </div>
@@ -71,7 +71,7 @@ function AuthenticatedLayout() {
       <div className="flex flex-1 flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border bg-card/30 px-5 backdrop-blur md:hidden">
           <button onClick={() => setOpen(true)}><Menu className="h-5 w-5" /></button>
-          <span className="font-display font-semibold">Meu Financeiro</span>
+          <span className="font-display font-semibold">DashFinanceiro</span>
           <div className="w-5" />
         </header>
         <main className="flex-1 px-5 py-6 md:px-10 md:py-10">

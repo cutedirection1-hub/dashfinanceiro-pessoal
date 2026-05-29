@@ -19,7 +19,7 @@ function Landing() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">M</div>
-          <span className="font-display text-lg font-semibold">Meu Financeiro</span>
+          <span className="font-display text-lg font-semibold">DashFinanceiro</span>
         </div>
         <div className="flex gap-3">
           <Link to="/login" className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Entrar</Link>

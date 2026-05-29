@@ -56,7 +56,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-2xl shadow-black/20">
         <Link to="/" className="mb-6 flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">M</div>
-          <span className="font-display font-semibold">Meu Financeiro</span>
+          <span className="font-display font-semibold">DashFinanceiro</span>
         </Link>
         <h1 className="text-2xl font-semibold">{title}</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">{subtitle}</p>

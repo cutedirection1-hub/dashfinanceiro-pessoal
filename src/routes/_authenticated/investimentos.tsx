@@ -10,7 +10,7 @@ import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/investimentos")({ component: InvestimentosPage });
 
-type Inv = { id: string; asset_class: string; ticker: string | null; name: string; quantity: number; average_price: number; current_price: number; funding_account_id: string | null };
+type Inv = { id: string; asset_class: string; ticker: string | null; name: string; quantity: number; average_price: number; current_price: number; funding_account_id: string | null; goal_value?: number; goal_date?: string; };
 type Account = { id: string; name: string };
 type Contrib = { id: string; investment_id: string; kind: string; amount: number; quantity: number | null; unit_price: number | null; occurred_on: string; funding_account_id: string | null; account_tx_id: string | null; notes: string | null };
 
@@ -32,7 +32,8 @@ const NO_FUNDING = new Set(["previdencia"]);
 function InvestimentosPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [show, setShow] = useState(false);
+  const [showGoal, setShowGoal] = useState(false);
+  const [goalFor, setGoalFor] = useState<Inv | null>(null);
   const [editing, setEditing] = useState<Inv | null>(null);
   const [contribFor, setContribFor] = useState<Inv | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -66,7 +67,14 @@ function InvestimentosPage() {
   const totalAporte = inv.reduce((s, i) => s + aporteOf(i), 0);
   const pnl = total - totalAporte;
 
-  const del = useMutation({
+  const goalMut = useMutation({
+    mutationFn: async (payload: { id: string; goal_value: number | null; goal_date: string | null }) => {
+      const { error } = await supabase.from("investments").update({ goal_value: payload.goal_value, goal_date: payload.goal_date }).eq("id", payload.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); toast.success("Meta salva"); },
+    onError: (e: any) => toast.error(e.message),
+  });
     mutationFn: async (id: string) => {
       await supabase.from("investment_contributions" as any).delete().eq("investment_id", id);
       const { error } = await supabase.from("investments").delete().eq("id", id);
@@ -183,7 +191,15 @@ function InvestimentosPage() {
                         return <div className={`text-[11px] tabular-nums ${cls}`}>{arr} {brl(r)} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)</div>;
                       })()}
                     </div>
-                    <button onClick={() => setContribFor(i)} className="ml-2 text-primary hover:underline text-xs whitespace-nowrap">+ Aporte</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setGoalFor(i); setShowGoal(true); }} className="text-primary hover:underline text-xs">Meta</button>
+                  {i.goal_value && i.goal_date && (
+                    <span className="text-xs text-muted-foreground">
+                      Meta: {brl(i.goal_value)} até {fmtDate(i.goal_date)}
+                      {` (${Math.min(100, (valueOf(i) / i.goal_value) * 100).toFixed(0)}%)`}
+                    </span>
+                  )}
+                </div>
                     <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Editar ativo / atualizar saldo"><RefreshCw className="h-4 w-4" /></button>
                     <button onClick={() => confirm("Remover ativo e todos os aportes?") && del.mutate(i.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
@@ -197,7 +213,15 @@ function InvestimentosPage() {
         );})()}
       </div>
 
-      {show && <InvDialog onClose={() => setShow(false)} userId={user!.id} editing={editing} accounts={accounts} />}
+      {showGoal && goalFor && (
+        <Dialog title="Meta do investimento" onClose={() => { setShowGoal(false); setGoalFor(null); }}>
+          <GoalForm inv={goalFor} onSave={(value, date) => {
+            goalMut.mutate({ id: goalFor.id, goal_value: value, goal_date: date });
+            setShowGoal(false);
+            setGoalFor(null);
+          }} />
+        </Dialog>
+      )}
       {contribFor && <ContribDialog onClose={() => setContribFor(null)} userId={user!.id} inv={contribFor} accounts={accounts} editing={null} initialKind="aporte" />}
     </div>
   );

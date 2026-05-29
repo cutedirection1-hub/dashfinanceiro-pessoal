@@ -1,6 +1,6 @@
 // PDF → fatura parser (client-side, usando pdfjs-dist)
 import * as pdfjs from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import workerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 // Configurar worker uma única vez
 (pdfjs as any).GlobalWorkerOptions.workerSrc = workerUrl;

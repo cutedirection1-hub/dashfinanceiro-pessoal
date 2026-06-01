@@ -118,8 +118,8 @@ function InvestimentosPage() {
             })}
           </div>
         </div>
-        </div>
       )}
+
 
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3">
         <div className="flex-1 relative min-w-[200px]">

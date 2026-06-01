@@ -75,6 +75,7 @@ function InvestimentosPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); toast.success("Meta salva"); },
     onError: (e: any) => toast.error(e.message),
   });
+  const delMut = useMutation({
     mutationFn: async (id: string) => {
       await supabase.from("investment_contributions" as any).delete().eq("investment_id", id);
       const { error } = await supabase.from("investments").delete().eq("id", id);

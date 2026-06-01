@@ -32,7 +32,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold">Algo deu errado</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <p className="mt-2 text-sm text-muted-foreground">Ocorreu um erro inesperado. Tente novamente.</p>
         <button
           onClick={() => { router.invalidate(); reset(); }}
           className="mt-6 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"

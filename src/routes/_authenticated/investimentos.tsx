@@ -32,6 +32,7 @@ const NO_FUNDING = new Set(["previdencia"]);
 function InvestimentosPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [show, setShow] = useState(false);
   const [showGoal, setShowGoal] = useState(false);
   const [goalFor, setGoalFor] = useState<Inv | null>(null);
   const [editing, setEditing] = useState<Inv | null>(null);
@@ -69,7 +70,7 @@ function InvestimentosPage() {
 
   const goalMut = useMutation({
     mutationFn: async (payload: { id: string; goal_value: number | null; goal_date: string | null }) => {
-      const { error } = await supabase.from("investments").update({ goal_value: payload.goal_value, goal_date: payload.goal_date }).eq("id", payload.id);
+      const { error } = await supabase.from("investments").update({ goal_value: payload.goal_value, goal_date: payload.goal_date } as any).eq("id", payload.id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); toast.success("Meta salva"); },
@@ -202,7 +203,7 @@ function InvestimentosPage() {
                   )}
                 </div>
                     <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Editar ativo / atualizar saldo"><RefreshCw className="h-4 w-4" /></button>
-                    <button onClick={() => confirm("Remover ativo e todos os aportes?") && del.mutate(i.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => confirm("Remover ativo e todos os aportes?") && delMut.mutate(i.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
                   {open && (
                     <ContribList inv={i} contribs={myContribs} accounts={accounts} />
@@ -224,6 +225,22 @@ function InvestimentosPage() {
         </Dialog>
       )}
       {contribFor && <ContribDialog onClose={() => setContribFor(null)} userId={user!.id} inv={contribFor} accounts={accounts} editing={null} initialKind="aporte" />}
+      {show && <InvDialog onClose={() => setShow(false)} userId={user!.id} editing={editing} accounts={accounts} />}
+    </div>
+  );
+}
+
+function GoalForm({ inv, onSave }: { inv: Inv; onSave: (value: number | null, date: string | null) => void }) {
+  const [value, setValue] = useState<string>(inv.goal_value ? String(inv.goal_value) : "");
+  const [date, setDate] = useState<string>(inv.goal_date ?? "");
+  return (
+    <div className="space-y-3">
+      <Field label="Valor (R$)"><input className="input" type="number" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} /></Field>
+      <Field label="Data alvo"><input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <div className="flex justify-end gap-2">
+        <button className="btn-secondary" onClick={() => onSave(null, null)}>Remover</button>
+        <button className="btn-primary" onClick={() => onSave(value ? Number(value) : null, date || null)}>Salvar</button>
+      </div>
     </div>
   );
 }

@@ -75,6 +75,7 @@ function InvestimentosPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); toast.success("Meta salva"); },
     onError: (e: any) => toast.error(e.message),
   });
+  const delMut = useMutation({
     mutationFn: async (id: string) => {
       await supabase.from("investment_contributions" as any).delete().eq("investment_id", id);
       const { error } = await supabase.from("investments").delete().eq("id", id);
@@ -117,8 +118,8 @@ function InvestimentosPage() {
             })}
           </div>
         </div>
-        </div>
       )}
+
 
       <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3">
         <div className="flex-1 relative min-w-[200px]">

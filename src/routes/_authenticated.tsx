@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Wallet, CreditCard, TrendingUp, FileText, LogOut, Menu, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { HiddenValuesProvider } from "@/hooks/use-hidden-values";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/login" });
-  },
+  // O guard precisa rodar no client onde localStorage existe.
+  // Em SSR/prerender getSession() retorna null e dispararia redirect indevido em refresh.
+  ssr: false,
   component: AuthenticatedLayout,
 });
 
@@ -37,6 +37,7 @@ function AuthenticatedLayout() {
   const logout = async () => { await supabase.auth.signOut(); navigate({ to: "/" }); };
 
   return (
+    <HiddenValuesProvider>
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-border bg-card transition-transform md:relative md:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
@@ -83,5 +84,6 @@ function AuthenticatedLayout() {
         </main>
       </div>
     </div>
+    </HiddenValuesProvider>
   );
 }

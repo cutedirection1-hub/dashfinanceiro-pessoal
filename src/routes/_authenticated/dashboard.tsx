@@ -217,10 +217,10 @@ function DashboardPage() {
             <LineChart data={chart}>
               <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
               <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
-              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} width={80} />
+              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => m(v).replace("R$", "")} width={80} />
               <Tooltip
                 contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
-                formatter={(v: number) => brl(v)}
+                formatter={(v: number) => m(v)}
               />
               {activeChart === "patrimonio" && <Line type="monotone" dataKey="patrimonio" stroke="oklch(0.72 0.18 265)" strokeWidth={2.5} dot={{ r: 4 }} />}
               {activeChart === "gasto" && <Line type="monotone" dataKey="gasto" stroke="oklch(0.78 0.18 155)" strokeWidth={2.5} dot={{ r: 4 }} />}

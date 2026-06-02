@@ -208,7 +208,7 @@ function CartoesPage() {
 
   return (
     <div>
-      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-md p-2">
+      <div className="sticky top-0 z-10 bg-card/70 p-1">
         <Header title="Cartões de crédito">
           <HideValuesToggle />
           <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>

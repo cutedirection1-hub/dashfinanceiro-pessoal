@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,14 @@ function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [paidBy, setPaidBy] = useState<Record<string, boolean>>({});
   const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
-  const { hidden } = useHiddenValues();
+  useEffect(() => {
+  const saved = localStorage.getItem('dashboardPaidBy');
+  if (saved) setPaidBy(JSON.parse(saved));
+}, []);
+useEffect(() => {
+  localStorage.setItem('dashboardPaidBy', JSON.stringify(paidBy));
+}, [paidBy]);
+const { hidden } = useHiddenValues();
   const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
 
   const { data, isLoading } = useQuery({

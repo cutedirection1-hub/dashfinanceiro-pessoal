@@ -293,13 +293,13 @@ function CartoesPage() {
       </div>
 
 
-      {(activeCard || isAll) && (
+      {(activeCard || isAll) && cats !== undefined && (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
               <h2 className="font-semibold">{isAll ? "Fatura consolidada" : "Fatura"} — {monthLabel(ymRef)}</h2>
               <p className="text-xs text-muted-foreground">
-                Total: {brl(invoiceTotal)}
+                Total: {m(invoiceTotal)}
                 {!isAll && cards.find((c) => c.id === activeCard) && (
                   <> · Vence em {fmtDate(invoiceDueDate(ymRef, cards.find((c) => c.id === activeCard)!.due_day))}</>
                 )}

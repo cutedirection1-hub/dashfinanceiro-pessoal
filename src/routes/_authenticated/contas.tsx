@@ -110,7 +110,7 @@ function ContasPage() {
                 <button title="Excluir conta e lançamentos" onClick={() => confirm("EXCLUIR essa conta e TODOS os seus lançamentos? Esta ação não pode ser desfeita.") && delAccount.mutate(a.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
-            <div className="mt-4 text-2xl font-semibold">{brl(balanceOf(a.id))}</div>
+            <div className="mt-4 text-2xl font-semibold">{m(balanceOf(a.id))}</div>
           </div>
         ))}
         {!accounts.length && <EmptyState text={showArchived ? "Nenhuma conta arquivada." : "Nenhuma conta cadastrada ainda."} />}

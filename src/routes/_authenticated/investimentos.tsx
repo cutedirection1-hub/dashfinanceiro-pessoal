@@ -42,10 +42,9 @@ function InvestimentosPage() {
   const [fSearch, setFSearch] = useState("");
   const [fClass, setFClass] = useState("all");
   const [fAccount, setFAccount] = useState("all");
-  // privacy toggle for monetary values
-  const [showValues, setShowValues] = useState(true);
-  const toggleShowValues = () => setShowValues(!showValues);
-  const formatDisplay = (value: any) => (showValues ? brl(value) : "••••");
+  // privacy toggle for monetary values (shared across tabs)
+  const { hidden } = useHiddenValues();
+  const formatDisplay = (value: any) => maskBrl(value, hidden);
 
   const { data } = useQuery({
     queryKey: ["inv"],

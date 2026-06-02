@@ -276,11 +276,11 @@ function CartoesPage() {
               </div>
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground">Fatura do mês</div>
-                <div className="text-2xl font-semibold">{brl(monthSpend)}</div>
+                <div className="text-2xl font-semibold">{m(monthSpend)}</div>
               </div>
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                  <span>Limite usado (futuro)</span><span>{brl(used)} / {brl(c.credit_limit)}</span>
+                  <span>Limite usado (futuro)</span><span>{m(used)} / {m(c.credit_limit)}</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                   <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />

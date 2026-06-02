@@ -140,18 +140,21 @@ function DashboardPage() {
           <h1 className="text-3xl font-semibold">Visão geral</h1>
           <p className="mt-1 text-sm text-muted-foreground capitalize">{monthLabel(ref.ym)}{ref.isCurrent && " (atual)"}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
-          <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
-          <button onClick={() => setMonthOffset(0)} className="rounded-md px-3 py-1 text-xs hover:bg-accent">Hoje</button>
-          <button onClick={() => setMonthOffset(monthOffset + 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+        <div className="flex items-center gap-2">
+          <HideValuesToggle />
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+            <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
+            <button onClick={() => setMonthOffset(0)} className="rounded-md px-3 py-1 text-xs hover:bg-accent">Hoje</button>
+            <button onClick={() => setMonthOffset(monthOffset + 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+          </div>
         </div>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={TrendingUp} label="Patrimônio" value={brl(patrimonio)} accent />
-        <Kpi icon={Wallet} label={ref.isCurrent ? "Saldo em contas" : "Saldo no fim do mês"} value={brl(accBalance)} />
-        <Kpi icon={CreditCard} label="Fatura do mês" value={brl(openInvoice)} />
-        <Kpi icon={Receipt} label="Gastos do mês" value={brl(monthSpend)} />
+        <Kpi icon={TrendingUp} label="Patrimônio" value={m(patrimonio)} accent />
+        <Kpi icon={Wallet} label={ref.isCurrent ? "Saldo em contas" : "Saldo no fim do mês"} value={m(accBalance)} />
+        <Kpi icon={CreditCard} label="Fatura do mês" value={m(openInvoice)} />
+        <Kpi icon={Receipt} label="Gastos do mês" value={m(monthSpend)} />
       </div>
 
       {payerEntries.length > 0 && (

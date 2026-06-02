@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, maskBrl } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon, Eye, EyeOff } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 
@@ -104,9 +104,7 @@ function InvestimentosPage() {
           <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary">
             <Plus className="h-4 w-4" /> Novo ativo
           </button>
-          <button onClick={toggleShowValues} className="ml-2 btn-secondary" title={hidden ? "Mostrar valores" : "Esconder valores"}>
-            {hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-          </button>
+          <HideValuesToggle className="ml-2 btn-secondary" title={hidden ? "Mostrar valores" : "Esconder valores"} />
         </Header>
       </div>
       <div className="mt-1 text-sm text-muted-foreground">

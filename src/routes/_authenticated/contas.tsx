@@ -138,7 +138,7 @@ function ContasPage() {
               <h2 className="font-semibold">Lançamentos</h2>
               <p className="text-xs text-muted-foreground">
                 {filtered.length} de {tx.length}{!hasFilter && tx.length >= txLimit && <> · mostrando últimos {txLimit} — use filtros para ver mais</>}
-                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{brl(filteredTotal)}</span>
+                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
               </p>
             </div>
             {hasFilter && (

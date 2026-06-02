@@ -16,6 +16,8 @@ type Tx = { id: string; account_id: string; amount: number; kind: string; descri
 function ContasPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { hidden } = useHiddenValues();
+  const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
   const [showAcct, setShowAcct] = useState(false);
   const [showTx, setShowTx] = useState(false);
   const [editTx, setEditTx] = useState<Tx | null>(null);

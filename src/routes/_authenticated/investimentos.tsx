@@ -3,10 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate } from "@/lib/format";
+import { brl, fmtDate, maskBrl } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
+import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 
 export const Route = createFileRoute("/_authenticated/investimentos")({ component: InvestimentosPage });
 
@@ -41,10 +42,9 @@ function InvestimentosPage() {
   const [fSearch, setFSearch] = useState("");
   const [fClass, setFClass] = useState("all");
   const [fAccount, setFAccount] = useState("all");
-  // privacy toggle for monetary values
-  const [showValues, setShowValues] = useState(true);
-  const toggleShowValues = () => setShowValues(!showValues);
-  const formatDisplay = (value: any) => (showValues ? brl(value) : "••••");
+  // privacy toggle for monetary values (shared across tabs)
+  const { hidden } = useHiddenValues();
+  const formatDisplay = (value: any) => maskBrl(value, hidden);
 
   const { data } = useQuery({
     queryKey: ["inv"],
@@ -100,10 +100,8 @@ function InvestimentosPage() {
   return (
     <div>
       <Header title="Investimentos">
+        <HideValuesToggle />
         <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo ativo</button>
-        <button onClick={toggleShowValues} className="ml-2 btn-secondary" title={showValues ? "Esconder valores" : "Mostrar valores"}>
-          {showValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
       </Header>
       <div className="mt-1 text-sm text-muted-foreground">
         Patrimônio: <span className="font-medium text-foreground">{formatDisplay(total)}</span> · Aportado: {formatDisplay(totalAporte)} ·{" "}

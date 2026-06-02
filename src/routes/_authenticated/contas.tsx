@@ -3,9 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate } from "@/lib/format";
+import { brl, fmtDate, maskBrl } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye, Search, X as XIcon } from "lucide-react";
+import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 
 export const Route = createFileRoute("/_authenticated/contas")({ component: ContasPage });
 
@@ -15,6 +16,8 @@ type Tx = { id: string; account_id: string; amount: number; kind: string; descri
 function ContasPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { hidden } = useHiddenValues();
+  const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
   const [showAcct, setShowAcct] = useState(false);
   const [showTx, setShowTx] = useState(false);
   const [editTx, setEditTx] = useState<Tx | null>(null);
@@ -83,7 +86,8 @@ function ContasPage() {
 
   return (
     <div>
-      <Header title="Contas bancárias" subtitle={`Saldo total: ${brl(total)}`}>
+      <Header title="Contas bancárias" subtitle={`Saldo total: ${m(total)}`}>
+        <HideValuesToggle />
         <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativas" : "Ver arquivadas"}</button>
         <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!accounts.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançamento</button>
         <button onClick={() => setShowAcct(true)} className="btn-primary"><Plus className="h-4 w-4" /> Nova conta</button>
@@ -106,7 +110,7 @@ function ContasPage() {
                 <button title="Excluir conta e lançamentos" onClick={() => confirm("EXCLUIR essa conta e TODOS os seus lançamentos? Esta ação não pode ser desfeita.") && delAccount.mutate(a.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
-            <div className="mt-4 text-2xl font-semibold">{brl(balanceOf(a.id))}</div>
+            <div className="mt-4 text-2xl font-semibold">{m(balanceOf(a.id))}</div>
           </div>
         ))}
         {!accounts.length && <EmptyState text={showArchived ? "Nenhuma conta arquivada." : "Nenhuma conta cadastrada ainda."} />}
@@ -134,7 +138,7 @@ function ContasPage() {
               <h2 className="font-semibold">Lançamentos</h2>
               <p className="text-xs text-muted-foreground">
                 {filtered.length} de {tx.length}{!hasFilter && tx.length >= txLimit && <> · mostrando últimos {txLimit} — use filtros para ver mais</>}
-                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{brl(filteredTotal)}</span>
+                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
               </p>
             </div>
             {hasFilter && (
@@ -202,7 +206,7 @@ function ContasPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className={`font-medium tabular-nums ${t.kind === "income" ? "text-primary" : ""}`}>
-                        {t.kind === "income" ? "+" : "-"}{brl(t.amount)}
+                        {t.kind === "income" ? "+" : "-"}{m(t.amount)}
                       </div>
                       <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                       <button onClick={() => confirm("Remover este lançamento?") && delTx.mutate(t.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>

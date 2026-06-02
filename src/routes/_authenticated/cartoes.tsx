@@ -3,12 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel } from "@/lib/format";
+import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
+import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 
 export const Route = createFileRoute("/_authenticated/cartoes")({ component: CartoesPage });
 
@@ -36,6 +37,8 @@ const COLOR_PRESETS = ["#ef4444","#f59e0b","#eab308","#10b981","#14b8a6","#06b6d
 function CartoesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { hidden } = useHiddenValues();
+  const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
   const [showCard, setShowCard] = useState(false);
   const [editCard, setEditCard] = useState<Card | null>(null);
   const [showTx, setShowTx] = useState(false);
@@ -206,6 +209,7 @@ function CartoesPage() {
   return (
     <div>
       <Header title="Cartões de crédito">
+        <HideValuesToggle />
         <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
         <button onClick={() => setShowCats(true)} className="btn-secondary"><Tag className="h-4 w-4" /> Categorias</button>
         <button onClick={() => recalcInvoices.mutate()} disabled={recalcInvoices.isPending || !cards.length} className="btn-secondary" title="Recalcular fatura de todas as compras com a regra atual"><RefreshCw className="h-4 w-4" /> Recalcular faturas</button>
@@ -232,11 +236,11 @@ function CartoesPage() {
               </div>
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground">Fatura do mês (soma)</div>
-                <div className="text-2xl font-semibold">{brl(totalMonth)}</div>
+                <div className="text-2xl font-semibold">{m(totalMonth)}</div>
               </div>
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                  <span>Limite usado (futuro)</span><span>{brl(totalUsed)} / {brl(totalLimit)}</span>
+                  <span>Limite usado (futuro)</span><span>{m(totalUsed)} / {m(totalLimit)}</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                   <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />
@@ -272,11 +276,11 @@ function CartoesPage() {
               </div>
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground">Fatura do mês</div>
-                <div className="text-2xl font-semibold">{brl(monthSpend)}</div>
+                <div className="text-2xl font-semibold">{m(monthSpend)}</div>
               </div>
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                  <span>Limite usado (futuro)</span><span>{brl(used)} / {brl(c.credit_limit)}</span>
+                  <span>Limite usado (futuro)</span><span>{m(used)} / {m(c.credit_limit)}</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                   <div className="h-full bg-primary" style={{ width: `${usedPct}%` }} />
@@ -289,13 +293,13 @@ function CartoesPage() {
       </div>
 
 
-      {(activeCard || isAll) && (
+      {(activeCard || isAll) && cats !== undefined && (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
               <h2 className="font-semibold">{isAll ? "Fatura consolidada" : "Fatura"} — {monthLabel(ymRef)}</h2>
               <p className="text-xs text-muted-foreground">
-                Total: {brl(invoiceTotal)}
+                Total: {m(invoiceTotal)}
                 {!isAll && cards.find((c) => c.id === activeCard) && (
                   <> · Vence em {fmtDate(invoiceDueDate(ymRef, cards.find((c) => c.id === activeCard)!.due_day))}</>
                 )}
@@ -330,7 +334,7 @@ function CartoesPage() {
                     <User className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="font-medium">{name}</span>
                     <span className="text-muted-foreground">·</span>
-                    <span className="tabular-nums">{brl(val)}</span>
+                    <span className="tabular-nums">{m(val)}</span>
                   </button>
                 ))}
               </div>
@@ -359,7 +363,7 @@ function CartoesPage() {
                         <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={88} paddingAngle={2}>
                           {pieData.map((d, i) => <Cell key={i} fill={d.color} stroke="transparent" />)}
                         </Pie>
-                        <RTooltip contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }} formatter={(v: number) => brl(v)} />
+                        <RTooltip contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }} formatter={(v: number) => m(v)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -369,7 +373,7 @@ function CartoesPage() {
                       return (
                         <li key={d.name} className="flex items-center justify-between gap-2">
                           <span className="flex items-center gap-2 truncate"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}</span>
-                          <span className="tabular-nums text-muted-foreground">{brl(d.value)} · {pct.toFixed(0)}%</span>
+                          <span className="tabular-nums text-muted-foreground">{m(d.value)} · {pct.toFixed(0)}%</span>
                         </li>
                       );
                     })}
@@ -414,7 +418,7 @@ function CartoesPage() {
                     <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}{isAll && cardMap[t.card_id] && <> · <span className="text-foreground/70">{cardMap[t.card_id].name}</span></>}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium tabular-nums">{brl(t.amount)}</span>
+                    <span className="font-medium tabular-nums">{m(t.amount)}</span>
                     <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => handleDelete(t)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>

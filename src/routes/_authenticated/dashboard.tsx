@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, monthLabel } from "@/lib/format";
+import { brl, monthLabel, maskBrl } from "@/lib/format";
 import { CreditCard, Wallet, TrendingUp, Receipt, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 import {
   ResponsiveContainer,
   LineChart,
@@ -21,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
+  const { hidden } = useHiddenValues();
+  const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
@@ -137,25 +140,28 @@ function DashboardPage() {
           <h1 className="text-3xl font-semibold">Visão geral</h1>
           <p className="mt-1 text-sm text-muted-foreground capitalize">{monthLabel(ref.ym)}{ref.isCurrent && " (atual)"}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
-          <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
-          <button onClick={() => setMonthOffset(0)} className="rounded-md px-3 py-1 text-xs hover:bg-accent">Hoje</button>
-          <button onClick={() => setMonthOffset(monthOffset + 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+        <div className="flex items-center gap-2">
+          <HideValuesToggle />
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+            <button onClick={() => setMonthOffset(monthOffset - 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
+            <button onClick={() => setMonthOffset(0)} className="rounded-md px-3 py-1 text-xs hover:bg-accent">Hoje</button>
+            <button onClick={() => setMonthOffset(monthOffset + 1)} className="rounded-md p-1.5 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+          </div>
         </div>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi icon={TrendingUp} label="Patrimônio" value={brl(patrimonio)} accent />
-        <Kpi icon={Wallet} label={ref.isCurrent ? "Saldo em contas" : "Saldo no fim do mês"} value={brl(accBalance)} />
-        <Kpi icon={CreditCard} label="Fatura do mês" value={brl(openInvoice)} />
-        <Kpi icon={Receipt} label="Gastos do mês" value={brl(monthSpend)} />
+        <Kpi icon={TrendingUp} label="Patrimônio" value={m(patrimonio)} accent />
+        <Kpi icon={Wallet} label={ref.isCurrent ? "Saldo em contas" : "Saldo no fim do mês"} value={m(accBalance)} />
+        <Kpi icon={CreditCard} label="Fatura do mês" value={m(openInvoice)} />
+        <Kpi icon={Receipt} label="Gastos do mês" value={m(monthSpend)} />
       </div>
 
       {payerEntries.length > 0 && (
         <div className="mt-6 rounded-2xl border border-border bg-card p-6">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-semibold">Divisão da fatura</h2>
-            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">A receber: <span className="font-semibold text-primary">{brl(owedByOthers)}</span></span>}
+            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">A receber: <span className="font-semibold text-primary">{m(owedByOthers)}</span></span>}
           </div>
           <p className="text-xs text-muted-foreground">Quanto cada responsável gastou no cartão neste mês</p>
           <div className="mt-4 space-y-2">
@@ -166,7 +172,7 @@ function DashboardPage() {
                 <div key={name}>
                   <div className="mb-1 flex justify-between text-xs">
                     <span className="flex items-center gap-1.5 text-muted-foreground"><User className="h-3 w-3" />{name}{!isMe && <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">a receber</span>}</span>
-                    <span className="tabular-nums">{brl(val)} · {pct.toFixed(0)}%</span>
+                    <span className="tabular-nums">{m(val)} · {pct.toFixed(0)}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-secondary">
                     <div className={`h-full ${isMe ? "bg-primary" : "bg-accent-foreground/60"}`} style={{ width: `${pct}%` }} />
@@ -211,10 +217,10 @@ function DashboardPage() {
             <LineChart data={chart}>
               <CartesianGrid stroke="oklch(0.28 0.03 265)" strokeDasharray="3 3" />
               <XAxis dataKey="mes" stroke="oklch(0.68 0.02 260)" fontSize={12} />
-              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => brl(v).replace("R$", "")} width={80} />
+              <YAxis stroke="oklch(0.68 0.02 260)" fontSize={12} tickFormatter={(v) => m(v).replace("R$", "")} width={80} />
               <Tooltip
                 contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }}
-                formatter={(v: number) => brl(v)}
+                formatter={(v: number) => m(v)}
               />
               {activeChart === "patrimonio" && <Line type="monotone" dataKey="patrimonio" stroke="oklch(0.72 0.18 265)" strokeWidth={2.5} dot={{ r: 4 }} />}
               {activeChart === "gasto" && <Line type="monotone" dataKey="gasto" stroke="oklch(0.78 0.18 155)" strokeWidth={2.5} dot={{ r: 4 }} />}

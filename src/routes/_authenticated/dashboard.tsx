@@ -22,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
+  const { hidden } = useHiddenValues();
+  const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],

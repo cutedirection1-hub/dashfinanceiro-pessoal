@@ -5,6 +5,10 @@ export const brl = (v: number | string | null | undefined) => {
   );
 };
 
+/** Formata como BRL ou, quando `hidden`, retorna uma máscara `R$ ••••`. */
+export const maskBrl = (v: number | string | null | undefined, hidden: boolean) =>
+  hidden ? "R$ ••••" : brl(v);
+
 export const fmtDate = (iso: string) => {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Date(Date.UTC(y, (m || 1) - 1, d || 1)).toLocaleDateString("pt-BR", {

@@ -1,107 +1,39 @@
-## Escopo
+## 1. "Sem categoria" aparecendo e sumindo no refresh (Cartões)
 
-Quatro melhorias independentes — uma em cada aba principal — mais uma nova aba para conversão de faturas PDF.
+**Causa:** Em `src/routes/_authenticated/cartoes.tsx` as duas queries são independentes — `cartoes` (transações) carrega imediatamente, mas `categories` só é habilitada quando `user?.id` existe e leva mais tempo. Nesse intervalo, `catMap[t.category_id]` retorna `undefined` → o item é renderizado como "Sem categoria" no gráfico/lista. Quando as categorias chegam, a UI rerenderiza correta.
 
----
+**Fix:** No componente da página, não renderizar a lista/gráfico de fatura enquanto `cats === undefined` (mostrar skeleton ou apenas aguardar). Alternativamente, ocultar/agrupar a fatia "Sem categoria" enquanto `cats` não carregou. Vou usar o gating por `cats !== undefined` no bloco da fatura para evitar flash.
 
-### 1. Investimentos — destaque quando estiver no negativo
+## 2. Refresh manda para `/login` mesmo logado
 
-Quando o valor atual de um ativo for menor que o aportado, mostrar visualmente que está no prejuízo.
+**Causa:** Em `src/routes/_authenticated.tsx`, o `beforeLoad` chama `supabase.auth.getSession()` durante SSR/prerender — onde não existe `localStorage` — e recebe `null`, disparando `redirect({ to: "/login" })`. No client, a sessão só é restaurada após hidratação.
 
-- Por ativo: ao lado de "Aportado X / Valor Y", adicionar uma terceira linha com **Resultado** (`valor − aportado`), em vermelho se < 0 e verde se > 0, com a variação percentual entre parênteses.
-- No `Header` do topo (subtitle): pintar o trecho "Resultado: …" em vermelho/verde conforme o sinal e prefixar com seta ↓/↑.
-- Por classe de ativo (card "Alocação"): caso a classe inteira esteja negativa, marcar o nome em vermelho.
-- Critério: comparar `Σ valueOf(i)` com `Σ aporteOf(i)` por ativo / classe / total.
+**Fix:** Remover o `beforeLoad` server-side e fazer a checagem apenas no client (já existe um `useEffect` em `AuthenticatedLayout` que faz `navigate({ to: "/login" })` quando `!user` após o `useAuth` carregar). O guard fica client-only, evitando o falso redirect no refresh. (O `useAuth` já usa `getSession()` + `onAuthStateChange` corretamente.)
 
----
+Alternativa mais segura: manter o guard mas marcar a rota com `ssr: false` para que `beforeLoad` rode só no client com `localStorage` disponível.
 
-### 2. Contas — filtros nos lançamentos
+→ Vou usar `ssr: false` na rota `_authenticated` (mantém o redirect server-style sem rodar no prerender).
 
-Adicionar uma faixa de filtros acima da lista "Últimos lançamentos":
+## 3. Botão global de "esconder valores"
 
-- **Conta** — `select` com "Todas" + cada conta.
-- **Tipo** — pílulas "Todos / Entrada / Saída".
-- **Período** — dois inputs `type="date"` (inicial e final), opcionais.
-- **Busca** — input de texto que faz `includes` case-insensitive em `description`.
+**Hoje:** existe só em `investimentos.tsx` como state local.
 
-Os filtros são aplicados em memória sobre o resultado já carregado, mas o `limit(100)` atual passa a ser:
+**Fix:** Criar contexto compartilhado `src/hooks/use-hidden-values.tsx` com:
+- `useState` persistido em `localStorage` (`hide-values:v1`)
+- Provider montado no layout `_authenticated.tsx`
+- Hook `useHiddenValues()` → `{ hidden, toggle }`
+- Helper `maskBrl(value, hidden)` que retorna `"R$ ••••"` quando ativo
 
-- Se houver qualquer filtro ativo → buscar até **1000** registros (`limit(1000)`).
-- Sem filtros → manter limit 100 e exibir aviso "Mostrando últimos 100 — use filtros para ver mais".
+Adicionar botão (ícone `Eye` / `EyeOff`) no header de cada página: Dashboard, Contas, Cartões, Investimentos. Trocar `brl(x)` por `maskBrl(x, hidden)` nos pontos visíveis: cards de totais, fatura, listas, gráficos (tooltip values).
 
-Total filtrado (somatório de entradas − saídas dos lançamentos visíveis) exibido no cabeçalho da lista.
+Em `investimentos.tsx`, substituir o state local pelo hook compartilhado.
 
----
+## Arquivos a alterar
 
-### 3. Cartões — visão "Todos os cartões"
-
-Permitir consolidar a fatura de todos os cartões mantendo os demais filtros (mês, pagador, categoria).
-
-- Novo card "Todos os cartões" no início da grade de cartões, comportando-se como um cartão selecionável (`activeCard = "all"`).
-- Quando `activeCard === "all"`:
-  - Fatura do topo do card mostra soma de `monthSpend` de todos os cartões.
-  - Bloco "Fatura — mês" agrega `card_transactions` de todos os cartões no `invoice_month` selecionado.
-  - Coluna extra "Cartão" em cada linha da lista, e o gráfico de pizza por categoria considera tudo junto.
-  - Botão "Lançar compra" continua exigindo escolha de cartão (sem mudança no dialog).
-  - Data de vencimento da fatura no header é ocultada (cada cartão tem a sua).
-- Mês, pagador, categoria continuam aplicáveis. Filtro por pagador agrega entre cartões.
-
----
-
-### 4. Nova aba: Fatura PDF → CSV
-
-Nova rota `src/routes/_authenticated/fatura-pdf.tsx`, adicionada ao `NAV` do `_authenticated.tsx` com ícone `FileText`.
-
-Fluxo:
-
-1. **Upload do PDF** (drag-and-drop + `<input type="file" accept="application/pdf">`).
-2. **Senha** (opcional) — campo que aparece automaticamente se o PDF estiver criptografado (detectado via erro `PasswordException` do pdfjs).
-3. **Detecção de emissor** por keywords no texto extraído: Nubank, Itaú, Bradesco, Santander, Banco do Brasil, Inter, C6 → fallback "Genérico". O usuário pode trocar manualmente via `select`.
-4. **Parser por emissor** roda regex específicas para cada layout e devolve `{ date, description, amount, installment? }[]`.
-5. **Prévia editável**: tabela com checkboxes (todos marcados por padrão), permitindo desmarcar linhas erradas e ajustar data/descrição/valor inline. Mostra contador "X de Y linhas detectadas".
-6. **Ações finais**:
-   - **Baixar CSV** (`data;descricao;valor` no mesmo formato aceito pelo importador atual).
-   - **Importar direto na fatura**: `select` de cartão + `select` opcional de categoria padrão → reaproveita a mesma mutation do `ImportCsvDialog` existente em `cartoes.tsx`.
-
-Tudo client-side (PDF não trafega para o servidor).
-
----
-
-## Detalhes técnicos
-
-### Dependência nova
-- `pdfjs-dist` (apenas frontend). Carregar o worker via `import 'pdfjs-dist/build/pdf.worker.min.mjs?url'` para evitar problemas de bundle.
-
-### Parsers de fatura (`src/lib/pdf-fatura.ts`)
-Estrutura:
-```ts
-type ParsedTx = { date: string; description: string; amount: number; installment?: { n: number; total: number } };
-type Issuer = 'nubank'|'itau'|'bradesco'|'santander'|'bb'|'inter'|'c6'|'generic';
-
-export async function extractPdfText(file: File, password?: string): Promise<string>;
-export function detectIssuer(text: string): Issuer;
-export function parseInvoice(text: string, issuer: Issuer, year?: number): ParsedTx[];
-```
-
-Heurísticas por emissor (resumido):
-- **Nubank**: linhas `DD MMM <descrição> R$ <valor>` ou `DD MMM <desc> - Parcela X/Y R$ valor`.
-- **Itaú**: `DD/MM/YYYY <desc> <valor>` em colunas, ignorando "Total", "Subtotal", linhas com `R$` no início.
-- **Bradesco / Santander / BB**: `DD/MM <desc> <valor>[D|C]`; `C` = crédito → ignora ou sinaliza estorno.
-- **Inter / C6**: `DD/MM/YYYY <desc> R$ valor` com bloco "Compras nacionais"/"internacionais".
-- **Genérico**: regex `(\d{2}[/\.\s-]\d{2}(?:[/\.\s-]\d{2,4})?)\s+(.+?)\s+(-?R?\$?\s*[\d\.\,]+)`; descarta linhas sem valor monetário ou cujo total seja > limites razoáveis.
-
-Cada parser retorna também o ano inferido a partir de qualquer "Vencimento dd/mm/yyyy" detectado no PDF; se falhar, usa o ano corrente.
-
-### Importação direta na fatura
-Refatorar `ImportCsvDialog` em `cartoes.tsx` extraindo o passo de "linhas parseadas → insert no banco" para `src/lib/card-import.ts` (`importCardRows(rows, { cardId, userId, defaultCategoryId, cards, categories })`). Reaproveitado pela nova aba.
-
-### Estrutura de arquivos
-- `src/lib/pdf-fatura.ts` (novo) — extração + detecção + parsers.
-- `src/lib/card-import.ts` (novo) — função compartilhada de importação.
-- `src/routes/_authenticated/fatura-pdf.tsx` (novo).
-- `src/routes/_authenticated/_authenticated.tsx` (`src/routes/_authenticated.tsx`) — adicionar item ao `NAV`.
-- `src/routes/_authenticated/investimentos.tsx` — chip de resultado por ativo + cor no subtitle.
-- `src/routes/_authenticated/contas.tsx` — barra de filtros + ajuste de limit.
-- `src/routes/_authenticated/cartoes.tsx` — card "Todos os cartões", suporte a `activeCard === "all"`, coluna "Cartão" na lista, agregação do gráfico de pizza, refator do importador.
-
-Nenhuma migração de schema é necessária.
+- `src/routes/_authenticated.tsx` — `ssr: false` + montar `HiddenValuesProvider`
+- `src/routes/_authenticated/cartoes.tsx` — gate por `cats !== undefined`; botão hide; `maskBrl`
+- `src/routes/_authenticated/contas.tsx` — botão hide; `maskBrl`
+- `src/routes/_authenticated/dashboard.tsx` — botão hide; `maskBrl`
+- `src/routes/_authenticated/investimentos.tsx` — substituir state por hook compartilhado
+- `src/hooks/use-hidden-values.tsx` — novo
+- `src/lib/format.ts` — exportar `maskBrl`

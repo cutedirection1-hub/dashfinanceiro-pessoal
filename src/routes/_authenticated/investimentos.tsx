@@ -3,10 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate } from "@/lib/format";
+import { brl, fmtDate, maskBrl } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
+import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 
 export const Route = createFileRoute("/_authenticated/investimentos")({ component: InvestimentosPage });
 

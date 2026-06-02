@@ -209,6 +209,7 @@ function CartoesPage() {
   return (
     <div>
       <Header title="Cartões de crédito">
+        <HideValuesToggle />
         <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
         <button onClick={() => setShowCats(true)} className="btn-secondary"><Tag className="h-4 w-4" /> Categorias</button>
         <button onClick={() => recalcInvoices.mutate()} disabled={recalcInvoices.isPending || !cards.length} className="btn-secondary" title="Recalcular fatura de todas as compras com a regra atual"><RefreshCw className="h-4 w-4" /> Recalcular faturas</button>

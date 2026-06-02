@@ -99,10 +99,16 @@ function InvestimentosPage() {
 
   return (
     <div>
-      <Header title="Investimentos">
-        <HideValuesToggle />
-        <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo ativo</button>
-      </Header>
+      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-md p-2">
+        <Header title="Investimentos">
+          <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary">
+            <Plus className="h-4 w-4" /> Novo ativo
+          </button>
+          <button onClick={toggleShowValues} className="ml-2 btn-secondary" title={hidden ? "Mostrar valores" : "Esconder valores"}>
+            {hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </button>
+        </Header>
+      </div>
       <div className="mt-1 text-sm text-muted-foreground">
         Patrimônio: <span className="font-medium text-foreground">{formatDisplay(total)}</span> · Aportado: {formatDisplay(totalAporte)} ·{" "}
         <span className={`font-medium ${pnlColor}`}>{pnlArrow} Resultado: {brl(pnl)}{totalAporte > 0 && <span className="text-xs"> ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)</span>}</span>

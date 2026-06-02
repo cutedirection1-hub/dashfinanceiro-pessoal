@@ -86,12 +86,14 @@ function ContasPage() {
 
   return (
     <div>
-      <Header title="Contas bancárias" subtitle={`Saldo total: ${m(total)}`}>
-        <HideValuesToggle />
-        <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativas" : "Ver arquivadas"}</button>
-        <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!accounts.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançamento</button>
-        <button onClick={() => setShowAcct(true)} className="btn-primary"><Plus className="h-4 w-4" /> Nova conta</button>
-      </Header>
+      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-md p-2">
+        <Header title="Contas bancárias" subtitle={`Saldo total: ${m(total)}`}>
+          <HideValuesToggle />
+          <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativas" : "Ver arquivadas"}</button>
+          <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!accounts.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançamento</button>
+          <button onClick={() => setShowAcct(true)} className="btn-primary"><Plus className="h-4 w-4" /> Nova conta</button>
+        </Header>
+      </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {accounts.map((a) => (

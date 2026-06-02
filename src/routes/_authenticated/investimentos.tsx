@@ -100,10 +100,8 @@ function InvestimentosPage() {
   return (
     <div>
       <Header title="Investimentos">
+        <HideValuesToggle />
         <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo ativo</button>
-        <button onClick={toggleShowValues} className="ml-2 btn-secondary" title={showValues ? "Esconder valores" : "Mostrar valores"}>
-          {showValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
       </Header>
       <div className="mt-1 text-sm text-muted-foreground">
         Patrimônio: <span className="font-medium text-foreground">{formatDisplay(total)}</span> · Aportado: {formatDisplay(totalAporte)} ·{" "}

@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, monthLabel } from "@/lib/format";
+import { brl, monthLabel, maskBrl } from "@/lib/format";
 import { CreditCard, Wallet, TrendingUp, Receipt, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 import {
   ResponsiveContainer,
   LineChart,

@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon, Eye, EyeOff } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 
 export const Route = createFileRoute("/_authenticated/investimentos")({ component: InvestimentosPage });
@@ -41,6 +41,10 @@ function InvestimentosPage() {
   const [fSearch, setFSearch] = useState("");
   const [fClass, setFClass] = useState("all");
   const [fAccount, setFAccount] = useState("all");
+  // privacy toggle for monetary values
+  const [showValues, setShowValues] = useState(true);
+  const toggleShowValues = () => setShowValues(!showValues);
+  const formatDisplay = (value: any) => (showValues ? brl(value) : "••••");
 
   const { data } = useQuery({
     queryKey: ["inv"],
@@ -74,7 +78,7 @@ function InvestimentosPage() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); toast.success("Meta salva"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => { console.error("Goal mutation error:", e); toast.error(e.message); },
   });
   const delMut = useMutation({
     mutationFn: async (id: string) => {
@@ -97,9 +101,12 @@ function InvestimentosPage() {
     <div>
       <Header title="Investimentos">
         <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo ativo</button>
+        <button onClick={toggleShowValues} className="ml-2 btn-secondary" title={showValues ? "Esconder valores" : "Mostrar valores"}>
+          {showValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
       </Header>
       <div className="mt-1 text-sm text-muted-foreground">
-        Patrimônio: <span className="font-medium text-foreground">{brl(total)}</span> · Aportado: {brl(totalAporte)} ·{" "}
+        Patrimônio: <span className="font-medium text-foreground">{formatDisplay(total)}</span> · Aportado: {formatDisplay(totalAporte)} ·{" "}
         <span className={`font-medium ${pnlColor}`}>{pnlArrow} Resultado: {brl(pnl)}{totalAporte > 0 && <span className="text-xs"> ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)</span>}</span>
       </div>
 
@@ -112,7 +119,7 @@ function InvestimentosPage() {
               const clsNeg = v < aportadoCls;
               return (
                 <div key={cls}>
-                  <div className="mb-1 flex justify-between text-xs"><span className={clsNeg ? "text-destructive" : "text-muted-foreground"}>{CLASSES[cls] || cls}{clsNeg && " ↓"}</span><span>{brl(v)} · {((v / total) * 100).toFixed(1)}%</span></div>
+                  <div className="mb-1 flex justify-between text-xs"><span className={clsNeg ? "text-destructive" : "text-muted-foreground"}>{CLASSES[cls] || cls}{clsNeg && " ↓"}</span><span>{formatDisplay(v)} · {((v / total) * 100).toFixed(1)}%</span></div>
                   <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full ${clsNeg ? "bg-destructive" : "bg-primary"}`} style={{ width: `${(v / total) * 100}%` }} /></div>
                 </div>
               );
@@ -183,21 +190,21 @@ function InvestimentosPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-muted-foreground">Aportado {brl(aportado)}</div>
-                      <div className="tabular-nums font-medium">{brl(valor)}</div>
+                      <div className="text-xs text-muted-foreground">Aportado {formatDisplay(aportado)}</div>
+                      <div className="tabular-nums font-medium">{formatDisplay(valor)}</div>
                       {aportado > 0 && (() => {
                         const r = valor - aportado;
                         const pct = (r / aportado) * 100;
                         const cls = r < 0 ? "text-destructive" : r > 0 ? "text-emerald-500" : "text-muted-foreground";
                         const arr = r < 0 ? "↓" : r > 0 ? "↑" : "·";
-                        return <div className={`text-[11px] tabular-nums ${cls}`}>{arr} {brl(r)} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)</div>;
+                        return <div className={`text-[11px] tabular-nums ${cls}`}>{arr} {formatDisplay(r)} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)</div>;
                       })()}
                     </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { setGoalFor(i); setShowGoal(true); }} className="text-primary hover:underline text-xs">Meta</button>
                   {i.goal_value && i.goal_date && (
                     <span className="text-xs text-muted-foreground">
-                      Meta: {brl(i.goal_value)} até {fmtDate(i.goal_date)}
+                      Meta: {formatDisplay(i.goal_value)} até {fmtDate(i.goal_date)}
                       {` (${Math.min(100, (valueOf(i) / i.goal_value) * 100).toFixed(0)}%)`}
                     </span>
                   )}
@@ -261,7 +268,7 @@ function ContribList({ inv, contribs, accounts }: { inv: Inv; contribs: Contrib[
       await recomputeInvestment(inv);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Removido"); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => { console.error("ContribList del error:", e); toast.error(e.message); },
   });
 
   return (
@@ -365,6 +372,7 @@ function ContribDialog({ onClose, userId, inv, accounts, editing, initialKind }:
   const save = useMutation({
     mutationFn: async () => {
       const amt = computedAmount;
+      console.log("ContribDialog computed amount:", amt, "payload details", {kind, isResg, inv, amt, requiresFunding, accountId, date, notes});
       if (!amt || amt <= 0) throw new Error("Valor inválido");
       if (isStockMode && (!Number(qty) || !Number(unitPrice))) throw new Error("Informe quantidade e preço");
       if (requiresFunding && !accountId) throw new Error("Selecione o banco");
@@ -426,7 +434,7 @@ function ContribDialog({ onClose, userId, inv, accounts, editing, initialKind }:
       toast.success("Salvo");
       onClose();
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => { console.error("ContribDialog error:", e); toast.error(e.message); },
   });
 
   return (
@@ -508,11 +516,15 @@ function InvDialog({ onClose, userId, editing, accounts }: { onClose: () => void
         };
       }
 
+      console.log("InvDialog payload:", payload);
       const q = editing
         ? supabase.from("investments").update(payload).eq("id", editing.id)
         : supabase.from("investments").insert(payload);
       const { error } = await q;
-      if (error) throw error;
+      if (error) {
+        console.error("InvDialog error:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inv"] });

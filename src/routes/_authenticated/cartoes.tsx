@@ -37,6 +37,8 @@ const COLOR_PRESETS = ["#ef4444","#f59e0b","#eab308","#10b981","#14b8a6","#06b6d
 function CartoesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { hidden } = useHiddenValues();
+  const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
   const [showCard, setShowCard] = useState(false);
   const [editCard, setEditCard] = useState<Card | null>(null);
   const [showTx, setShowTx] = useState(false);

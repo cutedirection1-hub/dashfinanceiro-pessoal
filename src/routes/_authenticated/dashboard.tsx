@@ -172,7 +172,7 @@ function DashboardPage() {
                 <div key={name}>
                   <div className="mb-1 flex justify-between text-xs">
                     <span className="flex items-center gap-1.5 text-muted-foreground"><User className="h-3 w-3" />{name}{!isMe && <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">a receber</span>}</span>
-                    <span className="tabular-nums">{brl(val)} · {pct.toFixed(0)}%</span>
+                    <span className="tabular-nums">{m(val)} · {pct.toFixed(0)}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-secondary">
                     <div className={`h-full ${isMe ? "bg-primary" : "bg-accent-foreground/60"}`} style={{ width: `${pct}%` }} />

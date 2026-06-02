@@ -418,7 +418,7 @@ function CartoesPage() {
                     <div className="text-xs text-muted-foreground">{fmtDate(t.purchased_on)} · {t.payer_name?.trim() || "Eu"}{isAll && cardMap[t.card_id] && <> · <span className="text-foreground/70">{cardMap[t.card_id].name}</span></>}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium tabular-nums">{brl(t.amount)}</span>
+                    <span className="font-medium tabular-nums">{m(t.amount)}</span>
                     <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => handleDelete(t)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>

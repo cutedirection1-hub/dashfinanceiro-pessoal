@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
+  const [paidBy, setPaidBy] = useState<Record<string, boolean>>({});
   const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
   const { hidden } = useHiddenValues();
   const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
@@ -87,6 +88,7 @@ function DashboardPage() {
   }, {});
   const payerEntries = Object.entries(byPayer).sort((a, b) => b[1] - a[1]);
   const owedByOthers = payerEntries.filter(([k]) => k.toLowerCase() !== "eu").reduce((s, [, v]) => s + v, 0);
+  const receivedAmount = payerEntries.reduce((sum, [name, val]) => sum + (paidBy[name] ? val : 0), 0);
 
   // Evolução: últimos 6 meses a partir do mês selecionado
   const chart: { mes: string; gasto: number; patrimonio: number; investimentos: number }[] = [];
@@ -161,7 +163,7 @@ function DashboardPage() {
         <div className="mt-6 rounded-2xl border border-border bg-card p-6">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-semibold">Divisão da fatura</h2>
-            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">A receber: <span className="font-semibold text-primary">{m(owedByOthers)}</span></span>}
+            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">Recebido: <span className="font-semibold text-primary">{m(receivedAmount)}</span> / <span className="font-semibold">{m(owedByOthers)}</span></span>}
           </div>
           <p className="text-xs text-muted-foreground">Quanto cada responsável gastou no cartão neste mês</p>
           <div className="mt-4 space-y-2">
@@ -171,11 +173,22 @@ function DashboardPage() {
               return (
                 <div key={name}>
                   <div className="mb-1 flex justify-between text-xs">
-                    <span className="flex items-center gap-1.5 text-muted-foreground"><User className="h-3 w-3" />{name}{!isMe && <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">a receber</span>}</span>
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      {!isMe && (
+                        <input
+                          type="checkbox"
+                          checked={!!paidBy[name]}
+                          onChange={(e) => setPaidBy(p => ({ ...p, [name]: e.target.checked }))}
+                          className="h-3 w-3 rounded border-border"
+                        />
+                      )}
+                      <User className="h-3 w-3" />
+                      {name}
+                    </span>
                     <span className="tabular-nums">{m(val)} · {pct.toFixed(0)}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                    <div className={`h-full ${isMe ? "bg-primary" : "bg-accent-foreground/60"}`} style={{ width: `${pct}%` }} />
+                    <div className={`h-full ${isMe ? "bg-primary" : paidBy[name] ? "bg-emerald-500" : "bg-accent-foreground/60"}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );

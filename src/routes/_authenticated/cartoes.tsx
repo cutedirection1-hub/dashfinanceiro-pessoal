@@ -363,7 +363,7 @@ function CartoesPage() {
                         <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={88} paddingAngle={2}>
                           {pieData.map((d, i) => <Cell key={i} fill={d.color} stroke="transparent" />)}
                         </Pie>
-                        <RTooltip contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }} formatter={(v: number) => brl(v)} />
+                        <RTooltip contentStyle={{ background: "oklch(0.21 0.025 265)", border: "1px solid oklch(0.28 0.03 265)", borderRadius: 8 }} formatter={(v: number) => m(v)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -373,7 +373,7 @@ function CartoesPage() {
                       return (
                         <li key={d.name} className="flex items-center justify-between gap-2">
                           <span className="flex items-center gap-2 truncate"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}</span>
-                          <span className="tabular-nums text-muted-foreground">{brl(d.value)} · {pct.toFixed(0)}%</span>
+                          <span className="tabular-nums text-muted-foreground">{m(d.value)} · {pct.toFixed(0)}%</span>
                         </li>
                       );
                     })}

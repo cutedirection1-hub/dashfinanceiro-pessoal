@@ -161,7 +161,7 @@ function DashboardPage() {
         <div className="mt-6 rounded-2xl border border-border bg-card p-6">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-semibold">Divisão da fatura</h2>
-            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">A receber: <span className="font-semibold text-primary">{brl(owedByOthers)}</span></span>}
+            {owedByOthers > 0 && <span className="text-sm text-muted-foreground">A receber: <span className="font-semibold text-primary">{m(owedByOthers)}</span></span>}
           </div>
           <p className="text-xs text-muted-foreground">Quanto cada responsável gastou no cartão neste mês</p>
           <div className="mt-4 space-y-2">

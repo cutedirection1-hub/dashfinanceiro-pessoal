@@ -334,7 +334,7 @@ function CartoesPage() {
                     <User className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="font-medium">{name}</span>
                     <span className="text-muted-foreground">·</span>
-                    <span className="tabular-nums">{brl(val)}</span>
+                    <span className="tabular-nums">{m(val)}</span>
                   </button>
                 ))}
               </div>

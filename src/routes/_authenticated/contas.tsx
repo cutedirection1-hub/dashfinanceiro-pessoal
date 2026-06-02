@@ -206,7 +206,7 @@ function ContasPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className={`font-medium tabular-nums ${t.kind === "income" ? "text-primary" : ""}`}>
-                        {t.kind === "income" ? "+" : "-"}{brl(t.amount)}
+                        {t.kind === "income" ? "+" : "-"}{m(t.amount)}
                       </div>
                       <button onClick={() => { setEditTx(t); setShowTx(true); }} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                       <button onClick={() => confirm("Remover este lançamento?") && delTx.mutate(t.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>

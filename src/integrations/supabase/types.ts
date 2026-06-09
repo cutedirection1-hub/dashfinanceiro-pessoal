@@ -285,6 +285,8 @@ export type Database = {
           created_at: string
           current_price: number
           funding_account_id: string | null
+          goal_date: string | null
+          goal_value: number | null
           id: string
           name: string
           notes: string | null
@@ -299,6 +301,8 @@ export type Database = {
           created_at?: string
           current_price?: number
           funding_account_id?: string | null
+          goal_date?: string | null
+          goal_value?: number | null
           id?: string
           name: string
           notes?: string | null
@@ -313,6 +317,8 @@ export type Database = {
           created_at?: string
           current_price?: number
           funding_account_id?: string | null
+          goal_date?: string | null
+          goal_value?: number | null
           id?: string
           name?: string
           notes?: string | null

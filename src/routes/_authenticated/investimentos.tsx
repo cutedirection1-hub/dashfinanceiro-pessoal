@@ -104,7 +104,7 @@ function InvestimentosPage() {
           <button onClick={() => { setEditing(null); setShow(true); }} className="btn-primary">
             <Plus className="h-4 w-4" /> Novo ativo
           </button>
-          <HideValuesToggle className="ml-2 btn-secondary" />
+          <HideValuesToggle className="ml-2 btn-secondary" title={hidden ? "Mostrar valores" : "Esconder valores"} />
         </Header>
       </div>
       <div className="mt-1 text-sm text-muted-foreground">

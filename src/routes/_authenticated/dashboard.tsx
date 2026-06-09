@@ -21,23 +21,35 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
+
+  const ref = useMemo(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + monthOffset);
+    const y = d.getFullYear(), m = d.getMonth();
+    return {
+      ym: `${y}-${String(m + 1).padStart(2, "0")}-01`,
+      start: new Date(y, m, 1).toISOString().slice(0, 10),
+      end: new Date(y, m + 1, 0).toISOString().slice(0, 10),
+      isCurrent: monthOffset === 0,
+    };
+  }, [monthOffset]);
+
   const [paidBy, setPaidBy] = useState<Record<string, boolean>>({});
   const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
 
-  // Mutation to update payment status in Supabase
-  const updatePaidStatus = useMutation({
-    mutationFn: async ({ name, paid }: { name: string; paid: boolean }) => {
-      const { error } = await supabase
-        .from('card_transactions')
-        .update({ paid_by_responsible: paid })
-        .eq('payer_name', name)
-        .eq('invoice_month', ref.ym);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      // Refetch can be added if needed
-    },
-  });
+  // Carrega o estado de pagamentos salvos do localStorage para o mês atual
+  useEffect(() => {
+    const saved = localStorage.getItem(`dashboardPaidBy_${ref.ym}`);
+    if (saved) {
+      setPaidBy(JSON.parse(saved));
+    } else {
+      setPaidBy({});
+    }
+  }, [ref.ym]);
+
+  // Salva o estado de pagamentos no localStorage sempre que paidBy ou o mês (ref.ym) mudar
+  useEffect(() => {
+    localStorage.setItem(`dashboardPaidBy_${ref.ym}`, JSON.stringify(paidBy));
+  }, [paidBy, ref.ym]);
 
   const { hidden } = useHiddenValues();
   const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
@@ -64,16 +76,7 @@ function DashboardPage() {
     },
   });
 
-  const ref = useMemo(() => {
-    const d = new Date(); d.setMonth(d.getMonth() + monthOffset);
-    const y = d.getFullYear(), m = d.getMonth();
-    return {
-      ym: `${y}-${String(m + 1).padStart(2, "0")}-01`,
-      start: new Date(y, m, 1).toISOString().slice(0, 10),
-      end: new Date(y, m + 1, 0).toISOString().slice(0, 10),
-      isCurrent: monthOffset === 0,
-    };
-  }, [monthOffset]);
+
 
   if (isLoading || !data) return <div className="text-muted-foreground">Carregando...</div>;
 
@@ -197,7 +200,6 @@ function DashboardPage() {
                           onChange={(e) => {
                           const checked = e.target.checked;
                           setPaidBy(p => ({ ...p, [name]: checked }));
-                          updatePaidStatus.mutate({ name, paid: checked });
                         }}
                           className="h-3 w-3 rounded border-border"
                         />

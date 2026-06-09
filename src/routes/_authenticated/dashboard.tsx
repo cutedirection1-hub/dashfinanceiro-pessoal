@@ -23,17 +23,26 @@ function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [paidBy, setPaidBy] = useState<Record<string, boolean>>({});
   const [activeChart, setActiveChart] = useState<"patrimonio" | "gasto" | "investimentos">("patrimonio");
-  useEffect(() => {
-  const saved = localStorage.getItem('dashboardPaidBy');
-  if (saved) setPaidBy(JSON.parse(saved));
-}, []);
-useEffect(() => {
-  localStorage.setItem('dashboardPaidBy', JSON.stringify(paidBy));
-}, [paidBy]);
-const { hidden } = useHiddenValues();
+
+  // Mutation to update payment status in Supabase
+  const updatePaidStatus = useMutation({
+    mutationFn: async ({ name, paid }: { name: string; paid: boolean }) => {
+      const { error } = await supabase
+        .from('card_transactions')
+        .update({ paid_by_responsible: paid })
+        .eq('payer_name', name)
+        .eq('invoice_month', ref.ym);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // Refetch can be added if needed
+    },
+  });
+
+  const { hidden } = useHiddenValues();
   const m = (v: number | string | null | undefined) => maskBrl(v, hidden);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
       const [accounts, accTx, cards, cardTx, inv, contrib] = await Promise.all([
@@ -185,7 +194,11 @@ const { hidden } = useHiddenValues();
                         <input
                           type="checkbox"
                           checked={!!paidBy[name]}
-                          onChange={(e) => setPaidBy(p => ({ ...p, [name]: e.target.checked }))}
+                          onChange={(e) => {
+                          const checked = e.target.checked;
+                          setPaidBy(p => ({ ...p, [name]: checked }));
+                          updatePaidStatus.mutate({ name, paid: checked });
+                        }}
                           className="h-3 w-3 rounded border-border"
                         />
                       )}

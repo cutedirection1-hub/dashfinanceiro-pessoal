@@ -309,7 +309,7 @@ function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[];
 // Shared UI helpers (used across pages)
 export function Header({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="sticky top-0 z-30 -mx-5 md:-mx-10 flex flex-wrap items-end justify-between gap-3 border-b border-border/60 bg-background/60 px-5 py-3 backdrop-blur-md md:px-10">
       <div>
         <h1 className="text-3xl font-semibold">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}

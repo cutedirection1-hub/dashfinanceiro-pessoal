@@ -1,25 +1,33 @@
-## Ajustes no Dashboard (src/routes/_authenticated/dashboard.tsx)
+## Objetivo
+Aplicar um fundo levemente destacado e translúcido no cabeçalho das páginas (título + ações), de modo que ao rolar a lista abaixo o conteúdo passe por trás sem "estranheza visual".
 
-### 1. Patrimônio = contas + investimentos (sem subtrair fatura)
+## Escopo
+Alterar apenas o componente `Header` em `src/routes/_authenticated/contas.tsx` (linha 310). Como esse mesmo componente é reutilizado por Cartões, Investimentos e demais páginas do layout autenticado, a mudança se propaga para todas.
 
-Atualmente:
-- KPI "Patrimônio": `accBalance + investTotal - openInvoice`
-- Gráfico (série `patrimonio`): `accBalAtEnd + investAtEnd - cards`
-- Legenda: "contas + investimentos − fatura"
+## Mudança visual
+- Fundo: `bg-background/60` (cor de fundo do tema com ~60% opacidade — sutil, mantém transparência).
+- Desfoque: `backdrop-blur-md` para suavizar o conteúdo que passa por trás ao rolar.
+- Borda inferior sutil: `border-b border-border/60` para separar do conteúdo.
+- Espaçamento interno: `px-4 py-3 -mx-4` (compensa o padding do `<main>` para o fundo alcançar as bordas laterais).
+- Sticky: `sticky top-0 z-30` para o cabeçalho permanecer visível durante a rolagem — é isso que dá utilidade à transparência.
 
-Mudar para:
-- KPI: `accBalance + investTotal`
-- Gráfico: `accBalAtEnd + investAtEnd`
-- Legenda: "contas + investimentos"
+Sem alterações em cores de marca, tipografia ou layout dos botões.
 
-### 2. Gastos = somente fatura do cartão com responsável "Eu"
+## Detalhes técnicos
+Substituir em `src/routes/_authenticated/contas.tsx`:
 
-Atualmente:
-- KPI "Gastos do mês": todas as saídas de contas do mês (`accTx` kind=expense).
-- Gráfico (série `gasto`): saídas de contas + total da fatura do mês (todos os responsáveis). Legenda: "contas + cartões".
+```tsx
+<div className="flex flex-wrap items-end justify-between gap-3">
+```
 
-Mudar para (aplicar a mesma regra em KPI e gráfico):
-- Somar apenas `cardTx` cujo `invoice_month` seja o mês em questão E cujo `payer_name` normalizado seja "Eu" (mesma normalização usada em `byPayer`: trim; vazio/null conta como "Eu").
-- Atualizar legenda para: "fatura do mês (responsável: Eu)".
+por:
 
-Sem outras mudanças de UI ou lógica.
+```tsx
+<div className="sticky top-0 z-30 -mx-5 md:-mx-10 flex flex-wrap items-end justify-between gap-3 border-b border-border/60 bg-background/60 px-5 py-3 backdrop-blur-md md:px-10">
+```
+
+Os offsets `-mx-5 md:-mx-10` / `px-5 md:px-10` casam com o padding do `<main>` em `_authenticated.tsx` (`px-5 md:px-10`), garantindo que o fundo translúcido cubra toda a largura ao rolar.
+
+## Fora de escopo
+- Não mexer no header interno da fatura em `cartoes.tsx` (linhas 311–316), que é outra barra de navegação de mês.
+- Sem mudanças de comportamento, dados ou outras páginas além do estilo do `Header`.

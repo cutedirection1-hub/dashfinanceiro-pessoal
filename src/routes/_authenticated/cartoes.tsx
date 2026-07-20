@@ -208,17 +208,15 @@ function CartoesPage() {
 
   return (
     <div>
-      <div className="sticky top-0 z-10 bg-card/70 p-1">
-        <Header title="Cartões de crédito">
-          <HideValuesToggle />
-          <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
-          <button onClick={() => setShowCats(true)} className="btn-secondary"><Tag className="h-4 w-4" /> Categorias</button>
-          <button onClick={() => recalcInvoices.mutate()} disabled={recalcInvoices.isPending || !cards.length} className="btn-secondary" title="Recalcular fatura de todas as compras com a regra atual"><RefreshCw className="h-4 w-4" /> Recalcular faturas</button>
-          <button onClick={() => setShowImport(true)} disabled={!cards.length} className="btn-secondary"><Upload className="h-4 w-4" /> Importar CSV</button>
-          <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
-          <button onClick={() => { setEditCard(null); setShowCard(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo cartão</button>
-        </Header>
-      </div>
+      <Header title="Cartões de crédito">
+        <HideValuesToggle />
+        <button onClick={() => setShowArchived((v) => !v)} className="btn-secondary"><Eye className="h-4 w-4" /> {showArchived ? "Ver ativos" : "Ver arquivados"}</button>
+        <button onClick={() => setShowCats(true)} className="btn-secondary"><Tag className="h-4 w-4" /> Categorias</button>
+        <button onClick={() => recalcInvoices.mutate()} disabled={recalcInvoices.isPending || !cards.length} className="btn-secondary" title="Recalcular fatura de todas as compras com a regra atual"><RefreshCw className="h-4 w-4" /> Recalcular faturas</button>
+        <button onClick={() => setShowImport(true)} disabled={!cards.length} className="btn-secondary"><Upload className="h-4 w-4" /> Importar CSV</button>
+        <button onClick={() => { setEditTx(null); setShowTx(true); }} disabled={!cards.length} className="btn-secondary"><Plus className="h-4 w-4" /> Lançar compra</button>
+        <button onClick={() => { setEditCard(null); setShowCard(true); }} className="btn-primary"><Plus className="h-4 w-4" /> Novo cartão</button>
+      </Header>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {cards.length > 1 && (() => {

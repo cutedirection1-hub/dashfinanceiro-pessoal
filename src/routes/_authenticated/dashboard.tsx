@@ -101,7 +101,7 @@ function DashboardPage() {
     .reduce((s, t) => s + Number(t.amount), 0);
 
   const investTotal = data.inv.reduce((s, i) => s + Number(i.quantity) * Number(i.current_price || i.average_price), 0);
-  const patrimonio = accBalance + investTotal - openInvoice;
+  const patrimonio = accBalance + investTotal;
 
   // Divisão por responsável da fatura do mês selecionado
   const byPayer = invoiceTx.reduce<Record<string, number>>((acc, t) => {

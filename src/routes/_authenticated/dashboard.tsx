@@ -92,8 +92,12 @@ function DashboardPage() {
   const invoiceTx = data.cardTx.filter((t) => t.invoice_month === ref.ym);
   const openInvoice = invoiceTx.reduce((s, t) => s + Number(t.amount), 0);
 
-  const monthSpend = data.accTx
-    .filter((t) => t.occurred_on >= ref.start && t.occurred_on <= ref.end && t.kind === "expense")
+  const isMePayer = (p: unknown) => {
+    const k = (typeof p === "string" ? p : "").trim();
+    return k === "" || k.toLowerCase() === "eu";
+  };
+  const monthSpend = invoiceTx
+    .filter((t) => isMePayer(t.payer_name))
     .reduce((s, t) => s + Number(t.amount), 0);
 
   const investTotal = data.inv.reduce((s, i) => s + Number(i.quantity) * Number(i.current_price || i.average_price), 0);

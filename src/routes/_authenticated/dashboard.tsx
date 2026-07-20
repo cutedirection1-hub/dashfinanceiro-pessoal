@@ -92,12 +92,16 @@ function DashboardPage() {
   const invoiceTx = data.cardTx.filter((t) => t.invoice_month === ref.ym);
   const openInvoice = invoiceTx.reduce((s, t) => s + Number(t.amount), 0);
 
-  const monthSpend = data.accTx
-    .filter((t) => t.occurred_on >= ref.start && t.occurred_on <= ref.end && t.kind === "expense")
+  const isMePayer = (p: unknown) => {
+    const k = (typeof p === "string" ? p : "").trim();
+    return k === "" || k.toLowerCase() === "eu";
+  };
+  const monthSpend = invoiceTx
+    .filter((t) => isMePayer(t.payer_name))
     .reduce((s, t) => s + Number(t.amount), 0);
 
   const investTotal = data.inv.reduce((s, i) => s + Number(i.quantity) * Number(i.current_price || i.average_price), 0);
-  const patrimonio = accBalance + investTotal - openInvoice;
+  const patrimonio = accBalance + investTotal;
 
   // Divisão por responsável da fatura do mês selecionado
   const byPayer = invoiceTx.reduce<Record<string, number>>((acc, t) => {
@@ -114,13 +118,13 @@ function DashboardPage() {
   void investTotal;
   for (let i = 5; i >= 0; i--) {
     const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
-    const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
     const e = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-    const accs = data.accTx.filter((t) => t.occurred_on >= s && t.occurred_on <= e && t.kind === "expense").reduce((s, t) => s + Number(t.amount), 0);
     const im = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-    const cards = data.cardTx.filter((t) => t.invoice_month === im).reduce((s, t) => s + Number(t.amount), 0);
+    const cardsMe = data.cardTx
+      .filter((t) => t.invoice_month === im && isMePayer(t.payer_name))
+      .reduce((s, t) => s + Number(t.amount), 0);
 
-    // Patrimônio no fim do mês: saldo das contas (com tx até o fim) + investimentos atuais - fatura em aberto
+    // Patrimônio no fim do mês: saldo das contas (com tx até o fim) + investimentos
     const accBalAtEnd = data.accounts.reduce((acc, a) => {
       const txSum = data.accTx
         .filter((t) => t.account_id === a.id && t.occurred_on <= e)
@@ -144,11 +148,11 @@ function DashboardPage() {
       return tot + val;
     }, 0);
 
-    const patAtEnd = accBalAtEnd + investAtEnd - cards;
+    const patAtEnd = accBalAtEnd + investAtEnd;
 
     chart.push({
       mes: d.toLocaleDateString("pt-BR", { month: "short" }),
-      gasto: accs + cards,
+      gasto: cardsMe,
       patrimonio: patAtEnd,
       investimentos: investAtEnd,
     });
@@ -230,8 +234,8 @@ function DashboardPage() {
               </select>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {activeChart === "patrimonio" && `6 meses até ${monthLabel(ref.ym)} (contas + investimentos − fatura)`}
-              {activeChart === "gasto" && `6 meses até ${monthLabel(ref.ym)} (contas + cartões)`}
+              {activeChart === "patrimonio" && `6 meses até ${monthLabel(ref.ym)} (contas + investimentos)`}
+              {activeChart === "gasto" && `6 meses até ${monthLabel(ref.ym)} (fatura do mês · responsável: Eu)`}
               {activeChart === "investimentos" && `6 meses até ${monthLabel(ref.ym)} (posição reconstruída por aportes e resgates)`}
             </p>
           </div>

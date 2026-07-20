@@ -234,8 +234,8 @@ function DashboardPage() {
               </select>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {activeChart === "patrimonio" && `6 meses até ${monthLabel(ref.ym)} (contas + investimentos − fatura)`}
-              {activeChart === "gasto" && `6 meses até ${monthLabel(ref.ym)} (contas + cartões)`}
+              {activeChart === "patrimonio" && `6 meses até ${monthLabel(ref.ym)} (contas + investimentos)`}
+              {activeChart === "gasto" && `6 meses até ${monthLabel(ref.ym)} (fatura do mês · responsável: Eu)`}
               {activeChart === "investimentos" && `6 meses até ${monthLabel(ref.ym)} (posição reconstruída por aportes e resgates)`}
             </p>
           </div>

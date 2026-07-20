@@ -120,11 +120,12 @@ function DashboardPage() {
     const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
     const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
     const e = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-    const accs = data.accTx.filter((t) => t.occurred_on >= s && t.occurred_on <= e && t.kind === "expense").reduce((s, t) => s + Number(t.amount), 0);
     const im = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-    const cards = data.cardTx.filter((t) => t.invoice_month === im).reduce((s, t) => s + Number(t.amount), 0);
+    const cardsMe = data.cardTx
+      .filter((t) => t.invoice_month === im && isMePayer(t.payer_name))
+      .reduce((s, t) => s + Number(t.amount), 0);
 
-    // Patrimônio no fim do mês: saldo das contas (com tx até o fim) + investimentos atuais - fatura em aberto
+    // Patrimônio no fim do mês: saldo das contas (com tx até o fim) + investimentos
     const accBalAtEnd = data.accounts.reduce((acc, a) => {
       const txSum = data.accTx
         .filter((t) => t.account_id === a.id && t.occurred_on <= e)
@@ -148,11 +149,11 @@ function DashboardPage() {
       return tot + val;
     }, 0);
 
-    const patAtEnd = accBalAtEnd + investAtEnd - cards;
+    const patAtEnd = accBalAtEnd + investAtEnd;
 
     chart.push({
       mes: d.toLocaleDateString("pt-BR", { month: "short" }),
-      gasto: accs + cards,
+      gasto: cardsMe,
       patrimonio: patAtEnd,
       investimentos: investAtEnd,
     });

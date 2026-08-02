@@ -31,7 +31,7 @@ function ContasPage() {
   const [fSearch, setFSearch] = useState<string>("");
   const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim() || fSort !== "desc";
-  const txLimit = hasFilter ? 1000 : 100;
+  const txLimit = 1000;
 
   const { data } = useQuery({
     queryKey: ["contas", showArchived, txLimit],
@@ -44,17 +44,33 @@ function ContasPage() {
     },
   });
 
+  // Saldos completos (todos os lançamentos, sem limite da lista)
+  const { data: sums } = useQuery({
+    queryKey: ["contas-saldos"],
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ account_id: string; amount: number; kind: string }>(
+        "account_transactions",
+        "account_id, amount, kind",
+      );
+      const map: Record<string, number> = {};
+      for (const r of rows) {
+        map[r.account_id] = (map[r.account_id] ?? 0) + (r.kind === "income" ? Number(r.amount) : -Number(r.amount));
+      }
+      return map;
+    },
+  });
+
   const accounts = data?.accounts ?? [];
   const tx = data?.tx ?? [];
 
   const balanceOf = (id: string) => {
     const a = accounts.find((x) => x.id === id);
     if (!a) return 0;
-    const sum = tx.filter((t) => t.account_id === id).reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
-    return Number(a.initial_balance) + sum;
+    return Number(a.initial_balance) + (sums?.[id] ?? 0);
   };
 
   const total = accounts.reduce((s, a) => s + balanceOf(a.id), 0);
+
 
   const archive = useMutation({
     mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {

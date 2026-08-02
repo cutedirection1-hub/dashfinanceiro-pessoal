@@ -79,7 +79,7 @@ function ContasPage() {
       const { error } = await supabase.from("accounts").update({ archived }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success(v.archived ? "Conta arquivada" : "Conta restaurada"); },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); toast.success(v.archived ? "Conta arquivada" : "Conta restaurada"); },
   });
 
   const delAccount = useMutation({
@@ -90,7 +90,7 @@ function ContasPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Conta excluída");
     },
@@ -99,7 +99,7 @@ function ContasPage() {
 
   const delTx = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("account_transactions").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Lançamento removido"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Lançamento removido"); },
   });
 
   return (
@@ -258,7 +258,7 @@ function NewAccountDialog({ onClose, userId }: { onClose: () => void; userId: st
       const { error } = await supabase.from("accounts").insert({ user_id: userId, name, bank: bank || null, type, initial_balance: Number(initial) || 0 });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success("Conta criada"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); toast.success("Conta criada"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -299,7 +299,7 @@ function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[];
       const { error } = await q;
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 

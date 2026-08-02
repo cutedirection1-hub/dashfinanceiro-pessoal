@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, maskBrl } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
+
 import { toast } from "sonner";
 import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye, Search, X as XIcon } from "lucide-react";
 import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";

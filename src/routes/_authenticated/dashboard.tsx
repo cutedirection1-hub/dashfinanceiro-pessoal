@@ -59,20 +59,21 @@ function DashboardPage() {
     queryFn: async () => {
       const [accounts, accTx, cards, cardTx, inv, contrib] = await Promise.all([
         supabase.from("accounts").select("*").eq("archived", false),
-        supabase.from("account_transactions").select("*"),
+        fetchAllRows<any>("account_transactions"),
         supabase.from("credit_cards").select("*").eq("archived", false),
-        supabase.from("card_transactions").select("*"),
+        fetchAllRows<any>("card_transactions"),
         supabase.from("investments").select("*"),
         supabase.from("investment_contributions").select("*"),
       ]);
       return {
         accounts: accounts.data ?? [],
-        accTx: accTx.data ?? [],
+        accTx,
         cards: cards.data ?? [],
-        cardTx: cardTx.data ?? [],
+        cardTx,
         inv: inv.data ?? [],
         contrib: contrib.data ?? [],
       };
+
     },
   });
 

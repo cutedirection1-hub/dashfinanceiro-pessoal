@@ -1,33 +1,20 @@
-## Objetivo
-Aplicar um fundo levemente destacado e translúcido no cabeçalho das páginas (título + ações), de modo que ao rolar a lista abaixo o conteúdo passe por trás sem "estranheza visual".
+# Corrigir saldo das contas com mais de 100 lançamentos
 
-## Escopo
-Alterar apenas o componente `Header` em `src/routes/_authenticated/contas.tsx` (linha 310). Como esse mesmo componente é reutilizado por Cartões, Investimentos e demais páginas do layout autenticado, a mudança se propaga para todas.
+## O problema (confirmado)
 
-## Mudança visual
-- Fundo: `bg-background/60` (cor de fundo do tema com ~60% opacidade — sutil, mantém transparência).
-- Desfoque: `backdrop-blur-md` para suavizar o conteúdo que passa por trás ao rolar.
-- Borda inferior sutil: `border-b border-border/60` para separar do conteúdo.
-- Espaçamento interno: `px-4 py-3 -mx-4` (compensa o padding do `<main>` para o fundo alcançar as bordas laterais).
-- Sticky: `sticky top-0 z-30` para o cabeçalho permanecer visível durante a rolagem — é isso que dá utilidade à transparência.
+Hoje a página Contas busca os lançamentos com um limite de 100 registros (só sobe para 1000 quando algum filtro está ativo). O saldo de cada conta e o "Saldo total" do cabeçalho são calculados somando **apenas os lançamentos carregados**.
 
-Sem alterações em cores de marca, tipografia ou layout dos botões.
+O banco já tem 103 lançamentos no total (uma conta sozinha tem 46, outra 30). Ou seja, os saldos exibidos sem filtro já estão errados: lançamentos mais antigos ficam de fora e o saldo "anda" conforme se aplica ou remove filtros.
+
+## O que muda
+
+1. **Saldo calculado no banco, não na lista.** Somar receitas/despesas por conta via consulta agregada, independente de quantos lançamentos existam e de qualquer filtro/limite da lista. O saldo passa a ser `saldo inicial + total de entradas - total de saídas` de todos os lançamentos da conta.
+2. **Saldo total** do cabeçalho passa a somar esses saldos completos.
+3. **Lista de lançamentos** continua paginada/limitada (é só visualização), mas o rodapé/legenda deixa de sugerir que o saldo depende do que está listado; o "Saldo" mostrado junto aos filtros continua sendo o saldo do recorte filtrado, com rótulo claro ("Saldo do filtro").
+4. **Sem filtro, subir o limite da lista** para o mesmo teto usado com filtro, evitando a impressão de lançamentos "sumindo".
 
 ## Detalhes técnicos
-Substituir em `src/routes/_authenticated/contas.tsx`:
 
-```tsx
-<div className="flex flex-wrap items-end justify-between gap-3">
-```
-
-por:
-
-```tsx
-<div className="sticky top-0 z-30 -mx-5 md:-mx-10 flex flex-wrap items-end justify-between gap-3 border-b border-border/60 bg-background/60 px-5 py-3 backdrop-blur-md md:px-10">
-```
-
-Os offsets `-mx-5 md:-mx-10` / `px-5 md:px-10` casam com o padding do `<main>` em `_authenticated.tsx` (`px-5 md:px-10`), garantindo que o fundo translúcido cubra toda a largura ao rolar.
-
-## Fora de escopo
-- Não mexer no header interno da fatura em `cartoes.tsx` (linhas 311–316), que é outra barra de navegação de mês.
-- Sem mudanças de comportamento, dados ou outras páginas além do estilo do `Header`.
+- Em `src/routes/_authenticated/contas.tsx`: nova query `["contas-saldos"]` que agrega por `account_id` (via RPC/consulta agregada ou paginação completa dos campos `account_id, amount, kind`), substituindo `balanceOf` baseado em `tx`.
+- Invalidar essa query nas mutações existentes (criar/editar/excluir lançamento, excluir conta).
+- Verificar `dashboard.tsx`: ele faz `select("*")` em `account_transactions` sem limite explícito, mas o teto padrão é 1000 linhas — incluir na mesma correção o cálculo agregado para evitar o mesmo bug quando o volume crescer.

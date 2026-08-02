@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, maskBrl } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
+
 import { toast } from "sonner";
 import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, Pencil, Archive, ArchiveRestore, Eye, Search, X as XIcon } from "lucide-react";
 import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
@@ -31,7 +33,7 @@ function ContasPage() {
   const [fSearch, setFSearch] = useState<string>("");
   const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim() || fSort !== "desc";
-  const txLimit = hasFilter ? 1000 : 100;
+  const txLimit = 1000;
 
   const { data } = useQuery({
     queryKey: ["contas", showArchived, txLimit],
@@ -44,24 +46,40 @@ function ContasPage() {
     },
   });
 
+  // Saldos completos (todos os lançamentos, sem limite da lista)
+  const { data: sums } = useQuery({
+    queryKey: ["contas-saldos"],
+    queryFn: async () => {
+      const rows = await fetchAllRows<{ account_id: string; amount: number; kind: string }>(
+        "account_transactions",
+        "account_id, amount, kind",
+      );
+      const map: Record<string, number> = {};
+      for (const r of rows) {
+        map[r.account_id] = (map[r.account_id] ?? 0) + (r.kind === "income" ? Number(r.amount) : -Number(r.amount));
+      }
+      return map;
+    },
+  });
+
   const accounts = data?.accounts ?? [];
   const tx = data?.tx ?? [];
 
   const balanceOf = (id: string) => {
     const a = accounts.find((x) => x.id === id);
     if (!a) return 0;
-    const sum = tx.filter((t) => t.account_id === id).reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
-    return Number(a.initial_balance) + sum;
+    return Number(a.initial_balance) + (sums?.[id] ?? 0);
   };
 
   const total = accounts.reduce((s, a) => s + balanceOf(a.id), 0);
+
 
   const archive = useMutation({
     mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
       const { error } = await supabase.from("accounts").update({ archived }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success(v.archived ? "Conta arquivada" : "Conta restaurada"); },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); toast.success(v.archived ? "Conta arquivada" : "Conta restaurada"); },
   });
 
   const delAccount = useMutation({
@@ -72,7 +90,7 @@ function ContasPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Conta excluída");
     },
@@ -81,7 +99,7 @@ function ContasPage() {
 
   const delTx = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("account_transactions").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Lançamento removido"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success("Lançamento removido"); },
   });
 
   return (
@@ -139,9 +157,10 @@ function ContasPage() {
             <div>
               <h2 className="font-semibold">Lançamentos</h2>
               <p className="text-xs text-muted-foreground">
-                {filtered.length} de {tx.length}{!hasFilter && tx.length >= txLimit && <> · mostrando últimos {txLimit} — use filtros para ver mais</>}
-                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
+                {filtered.length} de {tx.length}{tx.length >= txLimit && <> · mostrando últimos {txLimit}</>}
+                {" · "}Saldo do filtro: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
               </p>
+
             </div>
             {hasFilter && (
               <button onClick={clearAll} className="btn-secondary text-xs"><XIcon className="h-3.5 w-3.5" /> Limpar filtros</button>
@@ -240,7 +259,7 @@ function NewAccountDialog({ onClose, userId }: { onClose: () => void; userId: st
       const { error } = await supabase.from("accounts").insert({ user_id: userId, name, bank: bank || null, type, initial_balance: Number(initial) || 0 });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); toast.success("Conta criada"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); toast.success("Conta criada"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -281,7 +300,7 @@ function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[];
       const { error } = await q;
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 

@@ -157,9 +157,10 @@ function ContasPage() {
             <div>
               <h2 className="font-semibold">Lançamentos</h2>
               <p className="text-xs text-muted-foreground">
-                {filtered.length} de {tx.length}{!hasFilter && tx.length >= txLimit && <> · mostrando últimos {txLimit} — use filtros para ver mais</>}
-                {" · "}Saldo: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
+                {filtered.length} de {tx.length}{tx.length >= txLimit && <> · mostrando últimos {txLimit}</>}
+                {" · "}Saldo do filtro: <span className={`tabular-nums font-medium ${filteredTotal < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
               </p>
+
             </div>
             {hasFilter && (
               <button onClick={clearAll} className="btn-secondary text-xs"><XIcon className="h-3.5 w-3.5" /> Limpar filtros</button>

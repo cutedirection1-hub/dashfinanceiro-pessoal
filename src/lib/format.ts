@@ -1,9 +1,10 @@
 export const brl = (v: number | string | null | undefined) => {
-  const n = typeof v === "string" ? Number(v) : (v ?? 0);
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    Number.isFinite(n) ? n : 0,
-  );
+  const raw = typeof v === "string" ? Number(v) : (v ?? 0);
+  let n = Number.isFinite(raw) ? Math.round(raw * 100) / 100 : 0;
+  if (n === 0) n = 0; // normaliza -0 para 0 (evita "-R$ 0,00")
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 };
+
 
 /** Formata como BRL ou, quando `hidden`, retorna uma máscara `R$ ••••`. */
 export const maskBrl = (v: number | string | null | undefined, hidden: boolean) =>

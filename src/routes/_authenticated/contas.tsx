@@ -285,13 +285,26 @@ function NewAccountDialog({ onClose, userId }: { onClose: () => void; userId: st
 function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[]; onClose: () => void; userId: string; editing: Tx | null }) {
   const qc = useQueryClient();
   const [accountId, setAccountId] = useState(editing?.account_id ?? accounts[0]?.id ?? "");
-  const [kind, setKind] = useState<"income" | "expense">((editing?.kind as any) ?? "expense");
+  const [toAccountId, setToAccountId] = useState(accounts.find((a) => a.id !== (editing?.account_id ?? accounts[0]?.id))?.id ?? "");
+  const [kind, setKind] = useState<"income" | "expense" | "transfer">((editing?.kind as any) ?? "expense");
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
   const [desc, setDesc] = useState(editing?.description ?? "");
   const [date, setDate] = useState(editing?.occurred_on ?? new Date().toISOString().slice(0, 10));
 
   const save = useMutation({
     mutationFn: async () => {
+      if (kind === "transfer") {
+        if (!toAccountId || toAccountId === accountId) throw new Error("Escolha uma conta de destino diferente da origem.");
+        const from = accounts.find((a) => a.id === accountId)?.name ?? "conta";
+        const to = accounts.find((a) => a.id === toAccountId)?.name ?? "conta";
+        const base = desc.trim();
+        const { error } = await supabase.from("account_transactions").insert([
+          { user_id: userId, account_id: accountId, kind: "expense", amount: Number(amount), description: base || `Transferência para ${to}`, occurred_on: date },
+          { user_id: userId, account_id: toAccountId, kind: "income", amount: Number(amount), description: base || `Transferência de ${from}`, occurred_on: date },
+        ]);
+        if (error) throw error;
+        return;
+      }
       const payload = { user_id: userId, account_id: accountId, kind, amount: Number(amount), description: desc || null, occurred_on: date };
       const q = editing
         ? supabase.from("account_transactions").update(payload).eq("id", editing.id)
@@ -299,30 +312,43 @@ function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[];
       const { error } = await q;
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contas"] }); qc.invalidateQueries({ queryKey: ["contas-saldos"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(kind === "transfer" ? "Transferência registrada" : editing ? "Lançamento atualizado" : "Lançamento salvo"); onClose(); },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
     <Dialog title={editing ? "Editar lançamento" : "Novo lançamento"} onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
-        <div className="grid grid-cols-2 gap-2">
+        <div className={`grid gap-2 ${editing ? "grid-cols-2" : "grid-cols-3"}`}>
           <button type="button" onClick={() => setKind("expense")} className={`rounded-lg px-3 py-2 text-sm ${kind === "expense" ? "bg-destructive/20 text-destructive ring-1 ring-destructive/40" : "bg-secondary"}`}>Saída</button>
           <button type="button" onClick={() => setKind("income")} className={`rounded-lg px-3 py-2 text-sm ${kind === "income" ? "bg-primary/20 text-primary ring-1 ring-primary/40" : "bg-secondary"}`}>Entrada</button>
+          {!editing && (
+            <button type="button" onClick={() => setKind("transfer")} className={`rounded-lg px-3 py-2 text-sm ${kind === "transfer" ? "bg-foreground/15 ring-1 ring-foreground/30" : "bg-secondary"}`}>Entrecontas</button>
+          )}
         </div>
-        <Field label="Conta">
+        <Field label={kind === "transfer" ? "Conta de origem" : "Conta"}>
           <select required value={accountId} onChange={(e) => setAccountId(e.target.value)} className="input">
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </Field>
+        {kind === "transfer" && (
+          <Field label="Conta de destino">
+            <select required value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="input">
+              <option value="">Selecione...</option>
+              {accounts.filter((a) => a.id !== accountId).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Valor (R$)"><input type="number" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} className="input" /></Field>
-        <Field label="Descrição"><input value={desc} onChange={(e) => setDesc(e.target.value)} className="input" placeholder="Ex: Mercado" /></Field>
+        <Field label="Descrição"><input value={desc} onChange={(e) => setDesc(e.target.value)} className="input" placeholder={kind === "transfer" ? "Ex: Transferência" : "Ex: Mercado"} /></Field>
         <Field label="Data"><input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="input" /></Field>
         <button disabled={save.isPending} className="btn-primary w-full justify-center">{save.isPending ? "Salvando..." : "Salvar"}</button>
       </form>
     </Dialog>
   );
 }
+
+
 
 // Shared UI helpers (used across pages)
 export function Header({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {

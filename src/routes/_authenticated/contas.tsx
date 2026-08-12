@@ -348,10 +348,7 @@ function TxDialog({ accounts, onClose, userId, editing }: { accounts: Account[];
   );
 }
 
-      </form>
-    </Dialog>
-  );
-}
+
 
 // Shared UI helpers (used across pages)
 export function Header({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {

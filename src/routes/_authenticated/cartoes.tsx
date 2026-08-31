@@ -93,7 +93,8 @@ function CartoesPage() {
   const tx = data?.tx ?? [];
 
   const ymRef = useMemo(() => {
-    const d = new Date(); d.setMonth(d.getMonth() + monthOffset);
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   }, [monthOffset]);
 

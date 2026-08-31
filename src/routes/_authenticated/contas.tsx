@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,9 @@ function ContasPage() {
   const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim() || fSort !== "desc";
   const txLimit = 1000;
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [fAccount, fKind, fFrom, fTo, fSearch, fSort]);
 
   const { data } = useQuery({
     queryKey: ["contas", showArchived, txLimit],
@@ -150,13 +153,14 @@ function ContasPage() {
         filtered.sort((a, b) => fSort === "desc" ? b.occurred_on.localeCompare(a.occurred_on) : a.occurred_on.localeCompare(b.occurred_on));
         const filteredTotal = filtered.reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
         const clearAll = () => { setFAccount("all"); setFKind("all"); setFFrom(""); setFTo(""); setFSearch(""); setFSort("desc"); };
+        const visible = filtered.slice(0, visibleCount);
         return (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div>
               <h2 className="font-semibold">Lançamentos</h2>
               <p className="text-xs text-muted-foreground">
-                {filtered.length} de {tx.length}{tx.length >= txLimit && <> · mostrando últimos {txLimit}</>}
+                Mostrando {visible.length} de {filtered.length} filtrados (total {tx.length}){tx.length >= txLimit && <> · últimos {txLimit}</>}
                 {" · "}Saldo do filtro: <span className={`tabular-nums font-medium ${Math.round(filteredTotal * 100) / 100 < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
               </p>
 
@@ -212,8 +216,8 @@ function ContasPage() {
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento corresponde aos filtros.</div>
           ) : (
-            <ul className="divide-y divide-border">
-              {filtered.map((t) => {
+            <><ul className="divide-y divide-border">
+              {visible.map((t) => {
                 const acct = accounts.find((a) => a.id === t.account_id);
                 return (
                   <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
@@ -235,6 +239,13 @@ function ContasPage() {
                 );
               })}
             </ul>
+            {filtered.length > visible.length && (
+              <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border px-5 py-4">
+                <button onClick={() => setVisibleCount((v) => v + PAGE_SIZE)} className="btn-secondary text-xs">Mostrar mais {PAGE_SIZE}</button>
+                <button onClick={() => setVisibleCount(filtered.length)} className="btn-secondary text-xs">Mostrar todos ({filtered.length})</button>
+              </div>
+            )}
+            </>
           )}
         </div>
         );

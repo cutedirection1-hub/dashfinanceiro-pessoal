@@ -239,6 +239,13 @@ function ContasPage() {
                 );
               })}
             </ul>
+            {filtered.length > visible.length && (
+              <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border px-5 py-4">
+                <button onClick={() => setVisibleCount((v) => v + PAGE_SIZE)} className="btn-secondary text-xs">Mostrar mais {PAGE_SIZE}</button>
+                <button onClick={() => setVisibleCount(filtered.length)} className="btn-secondary text-xs">Mostrar todos ({filtered.length})</button>
+              </div>
+            )}
+            </>
           )}
         </div>
         );

@@ -25,7 +25,8 @@ function DashboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
 
   const ref = useMemo(() => {
-    const d = new Date(); d.setMonth(d.getMonth() + monthOffset);
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
     const y = d.getFullYear(), m = d.getMonth();
     return {
       ym: `${y}-${String(m + 1).padStart(2, "0")}-01`,

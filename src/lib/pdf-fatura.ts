@@ -206,12 +206,16 @@ export function parseInvoice(text: string, issuer: Issuer, yearHint?: number): P
   }
 }
 
-// Serialização CSV no formato esperado pelo importador (data;descricao;valor)
-export function toCSV(rows: ParsedTx[]): string {
-  const head = "data;descricao;valor";
+// Serialização CSV no formato esperado pelo importador
+// (data;descricao;valor;responsavel;categoria)
+export function toCSV(
+  rows: (ParsedTx & { payer?: string; categoryName?: string })[],
+): string {
+  const clean = (s: string) => s.replace(/[;\n\r]/g, " ").trim();
+  const head = "data;descricao;valor;responsavel;categoria";
   const body = rows.map((r) => {
-    const d = r.description.replace(/[;\n\r]/g, " ").trim();
-    return `${r.date};${d};${r.amount.toFixed(2).replace(".", ",")}`;
+    const d = clean(r.description);
+    return `${r.date};${d};${r.amount.toFixed(2).replace(".", ",")};${clean(r.payer ?? "")};${clean(r.categoryName ?? "")}`;
   });
   return [head, ...body].join("\n");
 }

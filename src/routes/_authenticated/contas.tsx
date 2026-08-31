@@ -216,8 +216,8 @@ function ContasPage() {
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento corresponde aos filtros.</div>
           ) : (
-            <ul className="divide-y divide-border">
-              {filtered.map((t) => {
+            <><ul className="divide-y divide-border">
+              {visible.map((t) => {
                 const acct = accounts.find((a) => a.id === t.account_id);
                 return (
                   <li key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">

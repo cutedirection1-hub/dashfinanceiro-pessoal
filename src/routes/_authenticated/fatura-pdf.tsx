@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
-import { Upload, Download, FileText, Lock, Send } from "lucide-react";
+import { Download, FileText, Lock, Send, ArrowLeftRight, Plus } from "lucide-react";
 import { Header, Field, EmptyState } from "./contas";
 import {
   extractPdfText, detectIssuer, parseInvoice, toCSV,
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_authenticated/fatura-pdf")({ component: 
 
 type Card = { id: string; name: string; closing_day: number; due_day: number };
 type Category = { id: string; name: string; color: string };
+type Row = ParsedTx & { payer: string; category_id: string };
 
 function FaturaPdfPage() {
   const { user } = useAuth();
@@ -26,11 +27,12 @@ function FaturaPdfPage() {
   const [needsPassword, setNeedsPassword] = useState(false);
   const [wrongPassword, setWrongPassword] = useState(false);
   const [issuer, setIssuer] = useState<Issuer>("generic");
-  const [rows, setRows] = useState<ParsedTx[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<boolean[]>([]);
   const [busy, setBusy] = useState(false);
   const [targetCard, setTargetCard] = useState<string>("");
   const [defaultCat, setDefaultCat] = useState<string>("");
+  const [defaultPayer, setDefaultPayer] = useState<string>("Eu");
 
   const { data: cards = [] } = useQuery({
     queryKey: ["cartoes-pdf-cards", user?.id], enabled: !!user?.id,
@@ -46,6 +48,21 @@ function FaturaPdfPage() {
       return (data ?? []) as Category[];
     },
   });
+  const { data: payers = [] } = useQuery({
+    queryKey: ["pdf-payers", user?.id], enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase.from("card_transactions").select("payer_name").limit(1000);
+      const set = new Set<string>(["Eu"]);
+      for (const r of data ?? []) {
+        const p = (r as { payer_name: string | null }).payer_name?.trim();
+        if (p) set.add(p);
+      }
+      return [...set].sort();
+    },
+  });
+
+  const toRows = (parsed: ParsedTx[]): Row[] =>
+    parsed.map((p) => ({ ...p, payer: defaultPayer, category_id: defaultCat }));
 
   const handleFile = async (f: File, pwd?: string) => {
     setFile(f); setBusy(true); setWrongPassword(false);
@@ -54,7 +71,7 @@ function FaturaPdfPage() {
       const iss = detectIssuer(text);
       setIssuer(iss);
       const parsed = parseInvoice(text, iss);
-      setRows(parsed);
+      setRows(toRows(parsed));
       setSelected(parsed.map(() => true));
       setNeedsPassword(false);
       if (import.meta.env.DEV) console.log("TEXTO EXTRAÍDO DO PDF:\n", text);
@@ -79,7 +96,7 @@ function FaturaPdfPage() {
       try {
         const text = await extractPdfText(file, password || undefined);
         const parsed = parseInvoice(text, iss);
-        setRows(parsed);
+        setRows(toRows(parsed));
         setSelected(parsed.map(() => true));
         toast.success(`Reanalisado: ${parsed.length} linha(s)`);
       } catch (e: any) { toast.error(e?.message || "Erro"); }
@@ -88,13 +105,20 @@ function FaturaPdfPage() {
 
   const visibleRows = rows.filter((_, i) => selected[i]);
   const total = visibleRows.reduce((s, r) => s + r.amount, 0);
+  const negatives = visibleRows.filter((r) => r.amount < 0).length;
 
-  const updateRow = (i: number, patch: Partial<ParsedTx>) => {
+  const updateRow = (i: number, patch: Partial<Row>) => {
     setRows((rs) => rs.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   };
 
+  // Ações em massa (apenas nas linhas marcadas)
+  const mapSelected = (fn: (r: Row) => Row) =>
+    setRows((rs) => rs.map((r, i) => (selected[i] ? fn(r) : r)));
+
+  const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
+
   const downloadCsv = () => {
-    const csv = toCSV(visibleRows);
+    const csv = toCSV(visibleRows.map((r) => ({ ...r, categoryName: catName(r.category_id) })));
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -110,9 +134,12 @@ function FaturaPdfPage() {
       if (!visibleRows.length) throw new Error("Nenhuma linha selecionada");
       return importCardRows(visibleRows.map((r) => ({
         date: r.date, description: r.description, amount: r.amount,
+        payer: r.payer?.trim() || defaultPayer,
+        category_id: r.category_id || defaultCat || null,
       })), {
         userId: user.id, cardId: card.id,
         closingDay: card.closing_day, dueDay: card.due_day,
+        defaultPayer: defaultPayer || "Eu",
         defaultCategoryId: defaultCat || null,
       });
     },
@@ -169,14 +196,35 @@ function FaturaPdfPage() {
             <EmptyState text={file ? "Nenhuma linha detectada — troque o emissor ou tente outro PDF." : "Selecione um PDF de fatura para começar."} />
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">{visibleRows.length} de {rows.length} marcados · Total: <span className="font-medium text-foreground tabular-nums">{brl(total)}</span></p>
-              <div className="max-h-80 overflow-auto rounded-lg border border-border">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {visibleRows.length} de {rows.length} marcados · Total: <span className="font-medium text-foreground tabular-nums">{brl(total)}</span>
+                  {negatives > 0 && <span className="ml-2 text-destructive">{negatives} valor(es) negativo(s)</span>}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => mapSelected((r) => ({ ...r, amount: -r.amount }))} className="btn-secondary h-7 px-2 text-xs">
+                    <ArrowLeftRight className="h-3 w-3" /> Inverter sinais
+                  </button>
+                  <button onClick={() => mapSelected((r) => ({ ...r, amount: Math.abs(r.amount) }))} className="btn-secondary h-7 px-2 text-xs">
+                    <Plus className="h-3 w-3" /> Tornar positivos
+                  </button>
+                  <button onClick={() => mapSelected((r) => ({ ...r, payer: defaultPayer, category_id: defaultCat }))} className="btn-secondary h-7 px-2 text-xs">
+                    Aplicar padrões
+                  </button>
+                </div>
+              </div>
+              <datalist id="pdf-payers">
+                {payers.map((p) => <option key={p} value={p} />)}
+              </datalist>
+              <div className="max-h-96 overflow-auto rounded-lg border border-border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-secondary/60 text-muted-foreground">
                     <tr>
                       <th className="p-2 text-left"><input type="checkbox" checked={selected.every(Boolean)} onChange={(e) => setSelected(rows.map(() => e.target.checked))} /></th>
                       <th className="p-2 text-left">Data</th>
                       <th className="p-2 text-left">Descrição</th>
+                      <th className="p-2 text-left">Responsável</th>
+                      <th className="p-2 text-left">Categoria</th>
                       <th className="p-2 text-right">Valor</th>
                     </tr>
                   </thead>
@@ -185,8 +233,24 @@ function FaturaPdfPage() {
                       <tr key={i} className={`border-t border-border/50 ${!selected[i] ? "opacity-40" : ""}`}>
                         <td className="p-1.5"><input type="checkbox" checked={selected[i]} onChange={(e) => setSelected((s) => s.map((v, idx) => idx === i ? e.target.checked : v))} /></td>
                         <td className="p-1.5"><input type="date" value={r.date} onChange={(e) => updateRow(i, { date: e.target.value })} className="bg-transparent w-32 text-xs" /></td>
-                        <td className="p-1.5"><input value={r.description} onChange={(e) => updateRow(i, { description: e.target.value })} className="bg-transparent w-full text-xs" /></td>
-                        <td className="p-1.5 text-right"><input type="number" step="0.01" value={r.amount} onChange={(e) => updateRow(i, { amount: Number(e.target.value) })} className="bg-transparent w-24 text-right text-xs tabular-nums" /></td>
+                        <td className="p-1.5"><input value={r.description} onChange={(e) => updateRow(i, { description: e.target.value })} className="bg-transparent w-full min-w-32 text-xs" /></td>
+                        <td className="p-1.5">
+                          <input list="pdf-payers" value={r.payer} onChange={(e) => updateRow(i, { payer: e.target.value })} placeholder="Eu" className="bg-transparent w-24 text-xs" />
+                        </td>
+                        <td className="p-1.5">
+                          <select value={r.category_id} onChange={(e) => updateRow(i, { category_id: e.target.value })} className="bg-transparent w-28 text-xs">
+                            <option value="">Sem categoria</option>
+                            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-1.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <input type="number" step="0.01" value={r.amount} onChange={(e) => updateRow(i, { amount: Number(e.target.value) })} className={`bg-transparent w-24 text-right text-xs tabular-nums ${r.amount < 0 ? "text-destructive" : ""}`} />
+                            <button type="button" title="Inverter sinal" onClick={() => updateRow(i, { amount: -r.amount })} className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                              <ArrowLeftRight className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -200,12 +264,15 @@ function FaturaPdfPage() {
       {rows.length > 0 && (
         <div className="mt-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">3. Exportar / Importar</h2>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <div className="mt-3 grid gap-3 md:grid-cols-4">
             <Field label="Cartão de destino (para importar)">
               <select value={targetCard} onChange={(e) => setTargetCard(e.target.value)} className="input">
                 <option value="">—</option>
                 {cards.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            </Field>
+            <Field label="Responsável padrão">
+              <input list="pdf-payers" value={defaultPayer} onChange={(e) => setDefaultPayer(e.target.value)} placeholder="Eu" className="input" />
             </Field>
             <Field label="Categoria padrão (opcional)">
               <select value={defaultCat} onChange={(e) => setDefaultCat(e.target.value)} className="input">

@@ -34,6 +34,9 @@ function ContasPage() {
   const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const hasFilter = fAccount !== "all" || fKind !== "all" || !!fFrom || !!fTo || !!fSearch.trim() || fSort !== "desc";
   const txLimit = 1000;
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [fAccount, fKind, fFrom, fTo, fSearch, fSort]);
 
   const { data } = useQuery({
     queryKey: ["contas", showArchived, txLimit],

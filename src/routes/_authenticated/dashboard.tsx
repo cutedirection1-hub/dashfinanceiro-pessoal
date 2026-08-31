@@ -121,7 +121,8 @@ function DashboardPage() {
   const chart: { mes: string; gasto: number; patrimonio: number; investimentos: number }[] = [];
   void investTotal;
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(); d.setMonth(d.getMonth() + monthOffset - i);
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() + monthOffset - i, 1);
     const e = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
     const im = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     const cardsMe = data.cardTx

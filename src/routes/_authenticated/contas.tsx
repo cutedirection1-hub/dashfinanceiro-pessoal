@@ -160,7 +160,7 @@ function ContasPage() {
             <div>
               <h2 className="font-semibold">Lançamentos</h2>
               <p className="text-xs text-muted-foreground">
-                {filtered.length} de {tx.length}{tx.length >= txLimit && <> · mostrando últimos {txLimit}</>}
+                Mostrando {visible.length} de {filtered.length} filtrados (total {tx.length}){tx.length >= txLimit && <> · últimos {txLimit}</>}
                 {" · "}Saldo do filtro: <span className={`tabular-nums font-medium ${Math.round(filteredTotal * 100) / 100 < 0 ? "text-destructive" : "text-primary"}`}>{m(filteredTotal)}</span>
               </p>
 

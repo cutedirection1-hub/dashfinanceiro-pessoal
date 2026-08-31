@@ -153,6 +153,7 @@ function ContasPage() {
         filtered.sort((a, b) => fSort === "desc" ? b.occurred_on.localeCompare(a.occurred_on) : a.occurred_on.localeCompare(b.occurred_on));
         const filteredTotal = filtered.reduce((s, t) => s + (t.kind === "income" ? Number(t.amount) : -Number(t.amount)), 0);
         const clearAll = () => { setFAccount("all"); setFKind("all"); setFFrom(""); setFTo(""); setFSearch(""); setFSort("desc"); };
+        const visible = filtered.slice(0, visibleCount);
         return (
         <div className="mt-8 rounded-2xl border border-border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">

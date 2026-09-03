@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl } from "@/lib/format";
+import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl, isCardNearDue } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";

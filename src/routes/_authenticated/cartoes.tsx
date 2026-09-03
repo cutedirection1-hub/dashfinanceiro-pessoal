@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl } from "@/lib/format";
+import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl, isCardNearDue } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";
@@ -255,9 +255,15 @@ function CartoesPage() {
           const used = tx.filter((t) => t.card_id === c.id && t.invoice_month >= ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
           const active = !isAll && activeCard === c.id;
+          const nearDue = isCardNearDue(c.due_day);
+          const cardClasses = nearDue
+            ? "border-warning/60 bg-warning/5"
+            : active
+              ? "border-primary/60 bg-primary/5"
+              : "border-border bg-card";
           return (
             <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
-              className={`cursor-pointer text-left rounded-2xl border p-5 transition ${active ? "border-primary/60 bg-primary/5" : "border-border bg-card"}`}>
+              className={`cursor-pointer text-left rounded-2xl border p-5 transition ${cardClasses}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-semibold">{c.name}</h3>

@@ -54,6 +54,25 @@ export function invoiceDueDate(invoiceMonthIso: string, dueDay: number): string 
   return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** Retorna true quando hoje está a 0, 1 ou 2 dias do próximo vencimento do cartão. */
+export function isCardNearDue(dueDay: number): boolean {
+  const local = new Date();
+  const today = new Date(Date.UTC(local.getFullYear(), local.getMonth(), local.getDate()));
+  const y = today.getUTCFullYear();
+  const m = today.getUTCMonth() + 1;
+  const currentMonthIso = `${y}-${String(m).padStart(2, "0")}-01`;
+  const parseIso = (iso: string) => {
+    const [py, pm, pd] = iso.slice(0, 10).split("-").map(Number);
+    return new Date(Date.UTC(py, pm - 1, pd));
+  };
+  let due = parseIso(invoiceDueDate(currentMonthIso, dueDay));
+  if (due < today) {
+    due = parseIso(invoiceDueDate(addMonths(currentMonthIso, 1), dueDay));
+  }
+  const diff = (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+  return diff >= 0 && diff <= 2;
+}
+
 export function addMonths(iso: string, n: number): string {
   const [y, m] = iso.slice(0, 10).split("-").map(Number);
   let monthIdx = (m || 1) - 1 + n;

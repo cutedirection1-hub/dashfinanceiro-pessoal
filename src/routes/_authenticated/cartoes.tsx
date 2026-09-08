@@ -322,7 +322,7 @@ function CartoesPage() {
                     }}
                     className="h-3.5 w-3.5 rounded border-border"
                   />
-                  <span className={paid ? "text-emerald-500 font-medium" : ""}>Pago</span>
+                  <span className={paid ? "text-blue-500 font-medium" : ""}>Pago</span>
                 </label>
               </div>
 

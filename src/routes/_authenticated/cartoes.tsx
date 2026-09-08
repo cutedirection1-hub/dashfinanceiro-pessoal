@@ -98,6 +98,20 @@ function CartoesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   }, [monthOffset]);
 
+  // Marcação "fatura paga" por cartão, salva por mês no navegador
+  const [paidCards, setPaidCards] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`cardPaid_${ymRef}`);
+      setPaidCards(saved ? JSON.parse(saved) : {});
+    } catch {
+      setPaidCards({});
+    }
+  }, [ymRef]);
+  useEffect(() => {
+    localStorage.setItem(`cardPaid_${ymRef}`, JSON.stringify(paidCards));
+  }, [paidCards, ymRef]);
+
   const isAll = selectedCard === "__all__";
   const activeCard = selectedCard ?? cards[0]?.id;
   const allCardTx = isAll

@@ -307,10 +307,25 @@ function CartoesPage() {
                   )}
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-xs text-muted-foreground">Fatura do mês</div>
-                <div className="text-2xl font-semibold">{m(monthSpend)}</div>
+              <div className="mt-4 flex items-end justify-between gap-2">
+                <div>
+                  <div className="text-xs text-muted-foreground">Fatura do mês</div>
+                  <div className={`text-2xl font-semibold ${paid ? "text-muted-foreground line-through" : ""}`}>{m(monthSpend)}</div>
+                </div>
+                <label onClick={(e) => e.stopPropagation()} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={paid}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setPaidCards((p) => ({ ...p, [c.id]: checked }));
+                    }}
+                    className="h-3.5 w-3.5 rounded border-border"
+                  />
+                  <span className={paid ? "text-emerald-500 font-medium" : ""}>Pago</span>
+                </label>
               </div>
+
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                   <span>Limite usado (futuro)</span><span>{m(used)} / {m(c.credit_limit)}</span>

@@ -98,6 +98,20 @@ function CartoesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   }, [monthOffset]);
 
+  // Marcação "fatura paga" por cartão, salva por mês no navegador
+  const [paidCards, setPaidCards] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`cardPaid_${ymRef}`);
+      setPaidCards(saved ? JSON.parse(saved) : {});
+    } catch {
+      setPaidCards({});
+    }
+  }, [ymRef]);
+  useEffect(() => {
+    localStorage.setItem(`cardPaid_${ymRef}`, JSON.stringify(paidCards));
+  }, [paidCards, ymRef]);
+
   const isAll = selectedCard === "__all__";
   const activeCard = selectedCard ?? cards[0]?.id;
   const allCardTx = isAll
@@ -238,7 +252,16 @@ function CartoesPage() {
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground">Fatura do mês (soma)</div>
                 <div className="text-2xl font-semibold">{m(totalMonth)}</div>
+                {(() => {
+                  const paidTotal = cards
+                    .filter((c) => paidCards[c.id])
+                    .reduce((s, c) => s + tx.filter((t) => t.card_id === c.id && t.invoice_month === ymRef).reduce((a, t) => a + Number(t.amount), 0), 0);
+                  return paidTotal > 0 ? (
+                    <div className="mt-1 text-xs text-muted-foreground">Pago: <span className="font-semibold text-emerald-500">{m(paidTotal)}</span> / {m(totalMonth)}</div>
+                  ) : null;
+                })()}
               </div>
+
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                   <span>Limite usado (futuro)</span><span>{m(totalUsed)} / {m(totalLimit)}</span>
@@ -255,12 +278,15 @@ function CartoesPage() {
           const used = tx.filter((t) => t.card_id === c.id && t.invoice_month >= ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
           const active = !isAll && activeCard === c.id;
-          const nearDue = isCardNearDue(c.due_day);
-          const cardClasses = nearDue
-            ? "border-warning/60 bg-warning/5"
-            : active
-              ? "border-primary/60 bg-primary/5"
-              : "border-border bg-card";
+          const paid = !!paidCards[c.id];
+          const nearDue = !paid && isCardNearDue(c.due_day);
+          const cardClasses = paid
+            ? "border-emerald-500/60 bg-emerald-500/5"
+            : nearDue
+              ? "border-warning/60 bg-warning/5"
+              : active
+                ? "border-primary/60 bg-primary/5"
+                : "border-border bg-card";
           return (
             <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
               className={`cursor-pointer text-left rounded-2xl border p-5 transition ${cardClasses}`}>
@@ -281,10 +307,25 @@ function CartoesPage() {
                   )}
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-xs text-muted-foreground">Fatura do mês</div>
-                <div className="text-2xl font-semibold">{m(monthSpend)}</div>
+              <div className="mt-4 flex items-end justify-between gap-2">
+                <div>
+                  <div className="text-xs text-muted-foreground">Fatura do mês</div>
+                  <div className={`text-2xl font-semibold ${paid ? "text-muted-foreground line-through" : ""}`}>{m(monthSpend)}</div>
+                </div>
+                <label onClick={(e) => e.stopPropagation()} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={paid}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setPaidCards((p) => ({ ...p, [c.id]: checked }));
+                    }}
+                    className="h-3.5 w-3.5 rounded border-border"
+                  />
+                  <span className={paid ? "text-emerald-500 font-medium" : ""}>Pago</span>
+                </label>
               </div>
+
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                   <span>Limite usado (futuro)</span><span>{m(used)} / {m(c.credit_limit)}</span>

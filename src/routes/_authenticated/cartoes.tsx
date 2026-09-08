@@ -281,7 +281,7 @@ function CartoesPage() {
           const paid = !!paidCards[c.id];
           const nearDue = !paid && isCardNearDue(c.due_day);
           const cardClasses = paid
-            ? "border-emerald-500/60 bg-emerald-500/5"
+            ? "border-blue-500/60 bg-blue-500/5"
             : nearDue
               ? "border-warning/60 bg-warning/5"
               : active

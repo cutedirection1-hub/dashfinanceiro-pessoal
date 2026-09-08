@@ -252,7 +252,16 @@ function CartoesPage() {
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground">Fatura do mês (soma)</div>
                 <div className="text-2xl font-semibold">{m(totalMonth)}</div>
+                {(() => {
+                  const paidTotal = cards
+                    .filter((c) => paidCards[c.id])
+                    .reduce((s, c) => s + tx.filter((t) => t.card_id === c.id && t.invoice_month === ymRef).reduce((a, t) => a + Number(t.amount), 0), 0);
+                  return paidTotal > 0 ? (
+                    <div className="mt-1 text-xs text-muted-foreground">Pago: <span className="font-semibold text-emerald-500">{m(paidTotal)}</span> / {m(totalMonth)}</div>
+                  ) : null;
+                })()}
               </div>
+
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                   <span>Limite usado (futuro)</span><span>{m(totalUsed)} / {m(totalLimit)}</span>

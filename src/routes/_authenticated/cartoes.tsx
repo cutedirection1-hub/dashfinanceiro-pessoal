@@ -278,12 +278,15 @@ function CartoesPage() {
           const used = tx.filter((t) => t.card_id === c.id && t.invoice_month >= ymRef).reduce((s, t) => s + Number(t.amount), 0);
           const usedPct = Math.min(100, (used / Math.max(Number(c.credit_limit), 1)) * 100);
           const active = !isAll && activeCard === c.id;
-          const nearDue = isCardNearDue(c.due_day);
-          const cardClasses = nearDue
-            ? "border-warning/60 bg-warning/5"
-            : active
-              ? "border-primary/60 bg-primary/5"
-              : "border-border bg-card";
+          const paid = !!paidCards[c.id];
+          const nearDue = !paid && isCardNearDue(c.due_day);
+          const cardClasses = paid
+            ? "border-emerald-500/60 bg-emerald-500/5"
+            : nearDue
+              ? "border-warning/60 bg-warning/5"
+              : active
+                ? "border-primary/60 bg-primary/5"
+                : "border-border bg-card";
           return (
             <div key={c.id} onClick={() => setSelectedCard(c.id)} role="button" tabIndex={0}
               className={`cursor-pointer text-left rounded-2xl border p-5 transition ${cardClasses}`}>

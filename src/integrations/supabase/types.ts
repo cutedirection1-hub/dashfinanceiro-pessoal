@@ -280,6 +280,7 @@ export type Database = {
       }
       investments: {
         Row: {
+          archived: boolean
           asset_class: string
           average_price: number
           created_at: string
@@ -296,6 +297,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           asset_class?: string
           average_price?: number
           created_at?: string
@@ -312,6 +314,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           asset_class?: string
           average_price?: number
           created_at?: string

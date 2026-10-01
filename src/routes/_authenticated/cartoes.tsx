@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl, isCardNearDue } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag, X } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
@@ -46,6 +46,7 @@ function CartoesPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
   const [payerFilter, setPayerFilter] = useState<string>("all");
+  const [catFilter, setCatFilter] = useState<string>("all");
   const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const [showArchived, setShowArchived] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -117,9 +118,10 @@ function CartoesPage() {
   const allCardTx = isAll
     ? tx.filter((t) => t.invoice_month === ymRef && cards.some((c) => c.id === t.card_id))
     : tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
-  const cardTx = payerFilter === "all"
+  const cardTx = (payerFilter === "all"
     ? allCardTx
-    : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter);
+    : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter))
+    .filter((t) => catFilter === "all" || (catFilter === "__none__" ? !t.category_id : t.category_id === catFilter));
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
   const cardMap = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
 
@@ -398,12 +400,34 @@ function CartoesPage() {
             const pieData = Object.entries(byCat)
               .map(([id, val]) => {
                 const c = id === "__none__" ? null : catMap[id];
-                return { name: c?.name || "Sem categoria", value: val, color: c?.color || "#475569" };
+                return { id, name: c?.name || "Sem categoria", value: val, color: c?.color || "#475569" };
               })
               .sort((a, b) => b.value - a.value);
             return (
               <div className="border-b border-border px-5 py-4">
-                <h3 className="mb-3 text-sm font-medium text-muted-foreground">Gastos por categoria</h3>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Gastos por categoria</h3>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">Filtrar:</label>
+                    <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="input h-8 py-0 text-xs">
+                      <option value="all">Todas</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <option value="__none__">Sem categoria</option>
+                    </select>
+                    {catFilter !== "all" && (
+                      <button
+                        onClick={() => setCatFilter("all")}
+                        className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition hover:bg-accent"
+                        style={catFilter !== "__none__"
+                          ? { borderColor: (catMap[catFilter]?.color || "#475569") + "66", color: catMap[catFilter]?.color || "#475569" }
+                          : { borderColor: "#64748b66", color: "#94a3b8" }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: catFilter !== "__none__" ? (catMap[catFilter]?.color || "#475569") : "#64748b" }} />
+                        {catFilter === "__none__" ? "Sem categoria" : catMap[catFilter]?.name || "Categoria"}
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="grid items-center gap-4 md:grid-cols-2">
                   <div className="h-56">
                     <ResponsiveContainer>
@@ -419,8 +443,13 @@ function CartoesPage() {
                     {pieData.map((d) => {
                       const pct = (d.value / Math.max(invoiceTotal, 1)) * 100;
                       return (
-                        <li key={d.name} className="flex items-center justify-between gap-2">
-                          <span className="flex items-center gap-2 truncate"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}</span>
+                        <li key={d.id} className="flex items-center justify-between gap-2">
+                          <button
+                            onClick={() => setCatFilter(catFilter === d.id ? "all" : d.id)}
+                            title={catFilter === d.id ? "Remover filtro" : "Filtrar por esta categoria"}
+                            className={`flex min-w-0 items-center gap-2 truncate text-left transition hover:text-foreground ${catFilter === d.id ? "text-foreground" : "text-foreground/80"}`}>
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}
+                          </button>
                           <span className="tabular-nums text-muted-foreground">{m(d.value)} · {pct.toFixed(0)}%</span>
                         </li>
                       );
@@ -442,7 +471,18 @@ function CartoesPage() {
           )}
 
           {cardTx.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {(payerFilter !== "all" || catFilter !== "all") ? (
+                <>
+                  Nenhum lançamento com os filtros atuais.
+                  <button
+                    onClick={() => { setPayerFilter("all"); setCatFilter("all"); }}
+                    className="ml-2 text-primary underline-offset-2 hover:underline">
+                    Limpar filtros
+                  </button>
+                </>
+              ) : "Nenhuma compra nesta fatura."}
+            </div>
           ) : (
             <ul className="divide-y divide-border">
               {[...cardTx].sort((a, b) => fSort === "desc" ? b.purchased_on.localeCompare(a.purchased_on) : a.purchased_on.localeCompare(b.purchased_on)).map((t) => {

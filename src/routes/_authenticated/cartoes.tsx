@@ -400,7 +400,7 @@ function CartoesPage() {
             const pieData = Object.entries(byCat)
               .map(([id, val]) => {
                 const c = id === "__none__" ? null : catMap[id];
-                return { name: c?.name || "Sem categoria", value: val, color: c?.color || "#475569" };
+                return { id, name: c?.name || "Sem categoria", value: val, color: c?.color || "#475569" };
               })
               .sort((a, b) => b.value - a.value);
             return (

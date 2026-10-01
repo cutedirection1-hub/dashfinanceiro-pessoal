@@ -46,6 +46,7 @@ function CartoesPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
   const [payerFilter, setPayerFilter] = useState<string>("all");
+  const [catFilter, setCatFilter] = useState<string>("all");
   const [fSort, setFSort] = useState<"desc" | "asc">("desc");
   const [showArchived, setShowArchived] = useState(false);
   const [showImport, setShowImport] = useState(false);

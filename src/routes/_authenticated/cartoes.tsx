@@ -405,7 +405,29 @@ function CartoesPage() {
               .sort((a, b) => b.value - a.value);
             return (
               <div className="border-b border-border px-5 py-4">
-                <h3 className="mb-3 text-sm font-medium text-muted-foreground">Gastos por categoria</h3>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Gastos por categoria</h3>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">Filtrar:</label>
+                    <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="input h-8 py-0 text-xs">
+                      <option value="all">Todas</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <option value="__none__">Sem categoria</option>
+                    </select>
+                    {catFilter !== "all" && (
+                      <button
+                        onClick={() => setCatFilter("all")}
+                        className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition hover:bg-accent"
+                        style={catFilter !== "__none__"
+                          ? { borderColor: (catMap[catFilter]?.color || "#475569") + "66", color: catMap[catFilter]?.color || "#475569" }
+                          : { borderColor: "#64748b66", color: "#94a3b8" }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: catFilter !== "__none__" ? (catMap[catFilter]?.color || "#475569") : "#64748b" }} />
+                        {catFilter === "__none__" ? "Sem categoria" : catMap[catFilter]?.name || "Categoria"}
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="grid items-center gap-4 md:grid-cols-2">
                   <div className="h-56">
                     <ResponsiveContainer>

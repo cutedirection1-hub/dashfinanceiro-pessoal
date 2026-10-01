@@ -118,9 +118,10 @@ function CartoesPage() {
   const allCardTx = isAll
     ? tx.filter((t) => t.invoice_month === ymRef && cards.some((c) => c.id === t.card_id))
     : tx.filter((t) => t.card_id === activeCard && t.invoice_month === ymRef);
-  const cardTx = payerFilter === "all"
+  const cardTx = (payerFilter === "all"
     ? allCardTx
-    : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter);
+    : allCardTx.filter((t) => (t.payer_name?.trim() || "Eu") === payerFilter))
+    .filter((t) => catFilter === "all" || (catFilter === "__none__" ? !t.category_id : t.category_id === catFilter));
   const invoiceTotal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
   const cardMap = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
 

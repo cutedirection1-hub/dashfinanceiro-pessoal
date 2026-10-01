@@ -442,13 +442,12 @@ function CartoesPage() {
                   <ul className="space-y-1.5 text-sm">
                     {pieData.map((d) => {
                       const pct = (d.value / Math.max(invoiceTotal, 1)) * 100;
-                      const id = d.name === "Sem categoria" ? "__none__" : Object.keys(byCat).find((k) => (catMap[k]?.name || "Sem categoria") === d.name) || "";
                       return (
-                        <li key={d.name} className="flex items-center justify-between gap-2">
+                        <li key={d.id} className="flex items-center justify-between gap-2">
                           <button
-                            onClick={() => setCatFilter(catFilter === id ? "all" : id)}
-                            title={catFilter === id ? "Remover filtro" : "Filtrar por esta categoria"}
-                            className={`flex min-w-0 items-center gap-2 truncate text-left transition hover:text-foreground ${catFilter === id ? "text-foreground" : "text-foreground/80"}`}>
+                            onClick={() => setCatFilter(catFilter === d.id ? "all" : d.id)}
+                            title={catFilter === d.id ? "Remover filtro" : "Filtrar por esta categoria"}
+                            className={`flex min-w-0 items-center gap-2 truncate text-left transition hover:text-foreground ${catFilter === d.id ? "text-foreground" : "text-foreground/80"}`}>
                             <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: d.color }} /> {d.name}
                           </button>
                           <span className="tabular-nums text-muted-foreground">{m(d.value)} · {pct.toFixed(0)}%</span>

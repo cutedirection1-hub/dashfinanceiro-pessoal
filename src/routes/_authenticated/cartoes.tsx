@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, invoiceMonth, invoiceDueDate, addMonths, monthLabel, maskBrl, isCardNearDue } from "@/lib/format";
 import { parseCSV, parseDateBR, parseMoney } from "@/lib/csv";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Pencil, User, Repeat, Eye, ArchiveRestore, Upload, RefreshCw, Info, Tag, X } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
@@ -471,7 +471,18 @@ function CartoesPage() {
           )}
 
           {cardTx.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma compra nesta fatura.</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {(payerFilter !== "all" || catFilter !== "all") ? (
+                <>
+                  Nenhum lançamento com os filtros atuais.
+                  <button
+                    onClick={() => { setPayerFilter("all"); setCatFilter("all"); }}
+                    className="ml-2 text-primary underline-offset-2 hover:underline">
+                    Limpar filtros
+                  </button>
+                </>
+              ) : "Nenhuma compra nesta fatura."}
+            </div>
           ) : (
             <ul className="divide-y divide-border">
               {[...cardTx].sort((a, b) => fSort === "desc" ? b.purchased_on.localeCompare(a.purchased_on) : a.purchased_on.localeCompare(b.purchased_on)).map((t) => {

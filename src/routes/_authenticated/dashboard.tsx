@@ -65,7 +65,7 @@ function DashboardPage() {
         fetchAllRows<any>("account_transactions"),
         supabase.from("credit_cards").select("*").eq("archived", false),
         fetchAllRows<any>("card_transactions"),
-        supabase.from("investments").select("*"),
+        supabase.from("investments").select("*").eq("archived", false),
         supabase.from("investment_contributions").select("*"),
       ]);
       return {

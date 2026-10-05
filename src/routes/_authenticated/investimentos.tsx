@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { brl, fmtDate, maskBrl } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Pencil, ChevronDown, ChevronRight, Search, XIcon, Eye, EyeOff, Archive, ArchiveRestore } from "lucide-react";
 import { Header, Dialog, Field, EmptyState } from "./contas";
 import { useHiddenValues, HideValuesToggle } from "@/hooks/use-hidden-values";
 
@@ -42,6 +42,7 @@ function InvestimentosPage() {
   const [fSearch, setFSearch] = useState("");
   const [fClass, setFClass] = useState("all");
   const [fAccount, setFAccount] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
   // privacy toggle for monetary values (shared across tabs)
   const { hidden } = useHiddenValues();
   const formatDisplay = (value: any) => maskBrl(value, hidden);
@@ -62,7 +63,17 @@ function InvestimentosPage() {
     },
   });
 
-  const inv = data?.inv ?? [];
+  const allInv = data?.inv ?? [];
+  const inv = allInv.filter((i) => !(i as any).archived);
+  const archiveMut = useMutation({
+    mutationFn: async (p: { id: string; archived: boolean }) => {
+      const { error } = await supabase.from("investments").update({ archived: p.archived } as any).eq("id", p.id);
+      if (error) throw error;
+      return p.archived;
+    },
+    onSuccess: (a) => { qc.invalidateQueries({ queryKey: ["inv"] }); qc.invalidateQueries({ queryKey: ["dashboard"] }); toast.success(a ? "Arquivado" : "Reativado"); },
+    onError: (e: any) => toast.error(e.message),
+  });
   const accounts = data?.accounts ?? [];
   const contribs = data?.contribs ?? [];
 
@@ -148,6 +159,10 @@ function InvestimentosPage() {
           <option value="all">Todos os bancos</option>
           {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          Mostrar arquivados
+        </label>
         {(fSearch || fClass !== "all" || fAccount !== "all") && (
           <button onClick={() => { setFSearch(""); setFClass("all"); setFAccount("all"); }} className="btn-secondary text-xs h-9"><XIcon className="h-3.5 w-3.5" /> Limpar</button>
         )}
@@ -155,7 +170,8 @@ function InvestimentosPage() {
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
         {(() => {
-          const filteredInv = inv.filter((i) => {
+          const filteredInv = allInv.filter((i) => {
+            if (!showArchived && (i as any).archived) return false;
             if (fClass !== "all" && i.asset_class !== fClass) return false;
             if (fAccount !== "all" && (i.funding_account_id || "") !== (fAccount === "none" ? "" : fAccount)) return false;
             if (fSearch.trim()) {
@@ -178,7 +194,7 @@ function InvestimentosPage() {
               const valor = valueOf(i);
               const open = expanded[i.id];
               return (
-                <li key={i.id}>
+                <li key={i.id} className={(i as any).archived ? "opacity-50" : ""}>
                   <div className="flex items-center gap-2 px-5 py-3 text-sm">
                     <button onClick={() => setExpanded({ ...expanded, [i.id]: !open })} className="text-muted-foreground hover:text-foreground">
                       {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -211,6 +227,7 @@ function InvestimentosPage() {
                   )}
                 </div>
                     <button onClick={() => { setEditing(i); setShow(true); }} className="text-muted-foreground hover:text-primary" title="Editar ativo / atualizar saldo"><RefreshCw className="h-4 w-4" /></button>
+                    <button onClick={() => archiveMut.mutate({ id: i.id, archived: !(i as any).archived })} className="text-muted-foreground hover:text-primary" title={(i as any).archived ? "Desarquivar" : "Arquivar"}>{(i as any).archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}</button>
                     <button onClick={() => confirm("Remover ativo e todos os aportes?") && delMut.mutate(i.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                   </div>
                   {open && (
